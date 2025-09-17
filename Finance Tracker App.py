@@ -9,8 +9,19 @@ root = Tk()
 #   Constants and Configurations   #
 # -------------------------------- #
 
+# Money related variables
+money_amount = 614 # Default money amount
+currency = "€" # Default currency symbol
+reserve_at_end_of_month = 0 # Amount to reserve at the end of the month
+daily_allowance = money_amount / 30
+
+EXCHANGE_RATES = {
+        "€": {"CZK": 24.32},
+        "CZK": {"€": 1/24.32}
+    }
+
 # Window dimensions and scaling configurations
-WINDOW_SCALING_PERCENT = 100 # Percentage of screen size to use for window dimensions
+WINDOW_SCALING_PERCENT = 75 # Percentage of screen size to use for window dimensions
 WINDOW_WIDTH = root.winfo_screenwidth() * (WINDOW_SCALING_PERCENT / 100)
 WINDOW_HEIGHT = root.winfo_screenheight() * (WINDOW_SCALING_PERCENT / 100)
 WINDOW_X_CENTER = WINDOW_WIDTH / 2
@@ -20,7 +31,9 @@ ONE_PERCENT_WIDTH = WINDOW_WIDTH / 100
 
 # Text configurations
 FONT = 'Arial'
-text_color = 'red'
+text_color_dynamic = "#81FCAC" # This color changes based on dark mode or light mode
+text_color = "#000000" # Default text color (black for light mode)
+TEXT_SIZE_SMALL = 8
 TEXT_SIZE_NORMAL = 12
 TEXT_SIZE_LARGE = 16
 TEXT_SIZE_XLARGE = 20
@@ -82,6 +95,7 @@ def center_screen():
     root.title(TITLE + TM)
 
 root.attributes("-fullscreen", is_fullscreen)
+
 def toggle_fullscreen(event):
     '''Toggles fullscreen mode for the application window.
     Args:
@@ -104,9 +118,9 @@ def redraw_ui():
     global is_dark_mode, padding_x, padding_y
     # Clear the canvas and redraw all UI elements with updated colors.
     # TODO: Implement UI redraw logic.
-    create_allowance_window(padding_x, padding_y, is_dark_mode)
+    create_allowance_window(padding_x, padding_y)
 
-def create_allowance_window(padding_x, padding_y, is_dark_mode):
+def create_allowance_window(padding_x, padding_y):
     '''Creates a new window for setting allowances.'''
     canvas.delete('allowance_window') # Remove existing allowance window if it exists (to avoid duplicates when redrawing UI)
     width = calculate_width_in_percent(padding_x, 40) # Width in percentages of window dimensions
@@ -115,12 +129,84 @@ def create_allowance_window(padding_x, padding_y, is_dark_mode):
     y1 = ONE_PERCENT_HEIGHT * padding_y / 2
     x2 = x1 + width - (padding_x * ONE_PERCENT_WIDTH / 2)
     y2 = y1 + height - (padding_y * ONE_PERCENT_HEIGHT / 2)
-    canvas.create_rectangle(x1, y1, x2, y2, 
+    main_rect_id = canvas.create_rectangle(x1, y1, x2, y2, 
                             fill=widget_fill_color,
                             outline=widget_border_color,
                             width=widget_border_width,
                             tag="allowance_window",
                             )
+
+    create_allowance_label(x1, x2, y1, y2, main_rect_id)
+
+def create_allowance_label(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    canvas.delete('allowance') # Remove existing allowance label if it exists (to avoid duplicates when redrawing UI)
+    height_percentage_label = 12
+    y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_label)
+    # Label background
+    canvas.create_rectangle(x1, y1, x2, y2_label,
+                            fill=widget_fill_color,
+                            outline=widget_border_color,
+                            width=widget_border_width,
+                            tag="allowance")
+    
+    # Centered text inside the label
+    canvas.create_text((x1 + x2) / 2, (y1 + y2_label) / 2, 
+                       text="Daily allowance:", 
+                       tag="allowance",
+                       font=(FONT, TEXT_SIZE_LARGE),
+                       fill=text_color)
+
+    create_allowance_currency(x1, x2, y1, y2_label, main_rect_id)
+
+def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    '''Creates a section for displaying the currency of the allowance.'''
+
+    # Currency section (rectangle below the label)
+    canvas.delete('allowance_currency') # Remove existing allowance currency if it exists (to avoid duplicates when redrawing UI)
+    height_percentage_currency = 24 # Height of the currency section in percentages of the allowance window height
+    y1_currency = y2
+    y2_currency = y1_currency + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_currency)
+    canvas.create_rectangle(x1, y1_currency, x2, y2_currency,
+                            fill=widget_fill_color,
+                            outline=widget_border_color,
+                            width=widget_border_width,
+                            tag="allowance_currency")
+
+    # Centered text inside the currency section
+    canvas.create_text((x1 + x2) / 2, (y1_currency + y2_currency) / 2, 
+                       text=f'{daily_allowance} {currency}', 
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_XLARGE),
+                       fill=text_color)
+    
+def calculate_money_conversion(money: float, currency_before: str, currency_after: str) -> float:
+    if currency_before == currency_after: return money
+    if currency_before not in EXCHANGE_RATES or currency_after not in EXCHANGE_RATES[currency_before]:
+        raise ValueError(f"Conversion rate from {currency_before} to {currency_after} not available.")
+    
+    conversion_rate = EXCHANGE_RATES[currency_before][currency_after]
+    print(conversion_rate)
+    return round(money * conversion_rate, 2)
+
+def switch_currency(event):
+    global currency, money_amount
+    if currency == "€":
+        new_currency = "CZK"
+    else:
+        new_currency = "€"
+    money_amount = calculate_money_conversion(money_amount, currency, new_currency)
+    currency = new_currency
+    print(money_amount)
+
+def calculate_height_of_item(item_id: int) -> float:
+    y1 = canvas.bbox(item_id)[1]
+    y2 = canvas.bbox(item_id)[3]
+    return y2 - y1
+
+def calculate_width_of_item(item_id: int) -> float:
+    x1 = canvas.bbox(item_id)[0]
+    x2 = canvas.bbox(item_id)[2]
+    return x2 - x1
 
 def calculate_width_in_percent(padding_x: float, percentage: float) -> float:
     '''Calculates the width in percentages of window dimensions based on padding and a given percentage.'''
@@ -145,14 +231,14 @@ def decrease_padding(event):
         padding_y -= 0.5
         padding_x = padding_y / (WINDOW_WIDTH / WINDOW_HEIGHT)
         redraw_ui()
-    
-create_allowance_window(padding_x, padding_y, is_dark_mode)
+
+create_allowance_window(padding_x, padding_y)
 
 root.bind("w", increase_padding)
 root.bind("s", decrease_padding)
 root.bind("<Escape>", toggle_fullscreen)
 root.bind("<D>", toggle_dark_mode)
 root.bind("<d>", toggle_dark_mode)
-
+root.bind("<C>", switch_currency)
 center_screen()
 root.mainloop()
