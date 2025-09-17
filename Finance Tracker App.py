@@ -196,7 +196,12 @@ def switch_currency(event):
         new_currency = "€"
     money_amount = calculate_money_conversion(money_amount, currency, new_currency)
     currency = new_currency
-    print(money_amount)
+    update_money_variables()
+    redraw_ui()
+
+def update_money_variables():
+    pass
+    daily_allowance = money_amount / 30
 
 def calculate_height_of_item(item_id: int) -> float:
     y1 = canvas.bbox(item_id)[1]
@@ -237,8 +242,11 @@ create_allowance_window(padding_x, padding_y)
 root.bind("w", increase_padding)
 root.bind("s", decrease_padding)
 root.bind("<Escape>", toggle_fullscreen)
+
 root.bind("<D>", toggle_dark_mode)
 root.bind("<d>", toggle_dark_mode)
+
 root.bind("<C>", switch_currency)
+root.bind("<c>", switch_currency)
 center_screen()
 root.mainloop()
