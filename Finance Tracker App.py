@@ -25,9 +25,11 @@ def get_days_in_curr_month() -> int:
     return days_in_month
 
 app_states = {
-    "money_amount": 600,
+    "budget": 900,
     "currency": "€",
-    "reserve_at_end_of_month": 200,
+    "reserve_at_end_of_month": 300,
+    "daily_allowance": 0, # calculated in code
+    "rolling_balance": 0, # calculated in code
     "days_left_in_month": get_days_left_in_curr_month(), # CURRENTLY NOT USED
     "window_bg_color": "#CBCBCB",
     "widget_border_color": "#000000",
@@ -37,16 +39,18 @@ app_states = {
     "is_fullscreen": False,
     "is_dark_mode": False,
     "dynamic_text_color": "#1B552F",  # This color is used for dynamic text (e.g., changing allowance)
+    "reserve_text_color": "#FD3D3D",
     "text_color": "#000000",  # Default text color (black for light mode)
     "spendings": { "18.9.2025": {"item": "Pivo", "price": 50, "currency": "CZK"},
                    "19.9.2025": {"item": "Burger", "price": 150, "currency": "CZK"}
                   }
 }
 
+CZK_RATE = 24.32
 
 EXCHANGE_RATES = {
-        "€": {"CZK": 24.32},
-        "CZK": {"€": 1/24.32}
+        "€": {"CZK": CZK_RATE},
+        "CZK": {"€": 1/CZK_RATE}
     }
 
 def get_padding_x():
@@ -67,15 +71,17 @@ def calculate_money_conversion(money: float, currency_before: str, currency_afte
     print(conversion_rate)
     return round(money * conversion_rate, 2)
 
-def calculate_daily_allowance(money_amount: float, reserve: float) -> float:
-    days_left = get_days_left_in_curr_month()
+def calculate_daily_allowance(budget: float, reserve: float) -> float:
     days_in_month = get_days_in_curr_month()
-    allowance_per_day = (money_amount - reserve) / days_in_month
-    print(app_states)
-    print(allowance_per_day)
-    return round(allowance_per_day * (days_in_month - days_left + 1), 2)
+    allowance_per_day = (budget - reserve) / days_in_month
+    return round(allowance_per_day, 2)
 
+def set_daily_allowance():
+    daily_allowance = calculate_daily_allowance(get("budget"), get("reserve_at_end_of_month"))
+    set_state("daily_allowance", daily_allowance)
 
+def add_daily_allowance():
+    set_state("rolling_balance", round(get("rolling_balance") + get("daily_allowance"), 2))
 
 
 
@@ -90,7 +96,9 @@ ONE_PERCENT_WIDTH = WINDOW_WIDTH / 100
 
 # Text configurations
 FONT = 'Arial'
-TEXT_SIZE_SMALL = 8
+BOLD = 'bold'
+ITALIC = 'italic'
+TEXT_SIZE_SMALL = 10
 TEXT_SIZE_NORMAL = 12
 TEXT_SIZE_LARGE = 16
 TEXT_SIZE_XLARGE = 20
@@ -168,8 +176,8 @@ def redraw_ui():
 def create_allowance_window(padding_x, padding_y):
     '''Creates a new window for setting allowances.'''
     canvas.delete('allowance_window') # Remove existing allowance window if it exists (to avoid duplicates when redrawing UI)
-    width = calculate_width_in_percent(padding_x, 40) # Width in percentages of window dimensions
-    height = calculate_height_in_percent(padding_y, 50) # Height in percentages of window dimensions
+    width = calculate_width_in_percent(padding_x, 50) # Width in percentages of window dimensions
+    height = calculate_height_in_percent(padding_y, 75) # Height in percentages of window dimensions
     x1 = ONE_PERCENT_WIDTH * padding_x / 2
     y1 = ONE_PERCENT_HEIGHT * padding_y / 2
     x2 = x1 + width - (padding_x * ONE_PERCENT_WIDTH / 2)
@@ -218,13 +226,39 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
                             tag="allowance_currency")
 
     # Centered text inside the currency section
-    daily_allowance = calculate_daily_allowance(get("money_amount"), get("reserve_at_end_of_month"))
+    rolling_balance = get("rolling_balance")
     canvas.create_text((x1 + x2) / 2, (y1_currency + y2_currency) / 2, 
-                       text=f'{daily_allowance} {get("currency")}', 
+                       text=f'{rolling_balance} {get("currency")}', 
                        tag="allowance_currency",
-                       font=(FONT, TEXT_SIZE_XLARGE),
+                       font=(FONT, TEXT_SIZE_XLARGE, BOLD),
                        fill=get("dynamic_text_color"))
     
+    # Text on the top right corner of the currency section indicating current daily allowance increase
+    daily_allowance = get("daily_allowance")
+    canvas.create_text(x2 - 10, y1_currency + 10, 
+                       text=f'Tomorrow: +{daily_allowance} {get("currency")}', 
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                       fill=get("dynamic_text_color"),
+                       anchor="ne")
+    
+    # Text on the top left corner of the currency section indicating budget
+    budget = get("budget")
+    canvas.create_text(x1 + 10, y1_currency + 10,
+                       text=f'Budget: {budget} {get("currency")}',
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                       fill=get("dynamic_text_color"),
+                       anchor="nw")
+    
+    # Text on the bottom left corner of the currency section indicating reserve at end of month
+    reserve = get("reserve_at_end_of_month")
+    canvas.create_text(x1 + 10, y2_currency - 10,
+                       text=f'Reserve: {reserve} {get("currency")}',
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                       fill=get("reserve_text_color"),
+                       anchor="sw")
 
 
 def switch_currency(event):
@@ -232,16 +266,15 @@ def switch_currency(event):
         new_currency = "CZK"
     else:
         new_currency = "€"
-    money_amount = calculate_money_conversion(get("money_amount"), get("currency"), new_currency)
-    reserve_amount = calculate_money_conversion(get("reserve_at_end_of_month"), get("currency"), new_currency) 
+    money_amount = calculate_money_conversion(get("budget"), get("currency"), new_currency)
+    reserve_amount = calculate_money_conversion(get("reserve_at_end_of_month"), get("currency"), new_currency)
+    rolling_balance = calculate_money_conversion(get("rolling_balance"), get("currency"), new_currency)
     set_state("currency", new_currency)
-    set_state("money_amount", money_amount)
+    set_state("budget", money_amount)
     set_state("reserve_at_end_of_month", reserve_amount)
-    update_money_variables()
+    set_state("rolling_balance", rolling_balance)
+    set_daily_allowance() # Recalculate daily allowance based on new budget and reserve amounts
     redraw_ui()
-
-def update_money_variables():
-    pass
 
 def calculate_height_of_item(item_id: int) -> float:
     y1 = canvas.bbox(item_id)[1]
@@ -272,8 +305,11 @@ def decrease_padding(event):
     if get("padding_y") > 0: # Limit minimum padding to 0%
         set_state("padding_y", get("padding_y") - 0.5)
         redraw_ui()
- 
 
+def add(event):
+    add_daily_allowance()
+    redraw_ui()
+set_daily_allowance()
 create_allowance_window(get_padding_x(), get("padding_y"))
 
 root.bind("w", increase_padding)
@@ -282,9 +318,22 @@ root.bind("<Escape>", toggle_fullscreen)
 
 root.bind("<D>", toggle_dark_mode)
 root.bind("<d>", toggle_dark_mode)
-
+root.bind("a", add)
 root.bind("<C>", switch_currency)
 root.bind("<c>", switch_currency)
 
 center_screen()
 root.mainloop()
+
+# TODO TODO!!!! MOST IMPORTANT!! SET UP A JSON FILE ASAP. CANT CONTINUE WITHOUT IT!
+
+# TODO: Add a way to log spendings and view them in a list, possibly with dates and categories.
+# TODO: When user adds a spending, check whether its larger than their rolling balance. If so, allow them to choose
+#       whether they want to reduce their rolling balance to the negatives, or let it impact the budget for the rest of the month.
+#       (in which case daily allowance would be reduced for the rest of the month)
+# TODO: Add a way to save and load user settings (budget, reserve, currency, dark mode preference, spendings) to/from a file.
+# TODO: Add a way to reset the rolling balance to the initial budget at the start of a new month.
+# TODO: Calculate rolling balance based on current date.
+# TODO: Add graphs to visualize spendings over time.
+# TODO: Reset daily allowance and rolling balance at the start of a new month (with notifications how much they saved).
+# TODO: 
