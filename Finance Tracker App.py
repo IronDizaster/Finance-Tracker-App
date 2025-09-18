@@ -1,27 +1,86 @@
 from tkinter import *
 from tkinter import messagebox
 import json
-import datetime
+from datetime import date
 import math
+import calendar
 
 root = Tk()
-# -------------------------------- #
-#   Constants and Configurations   #
-# -------------------------------- #
+spendings = 100
 
-# Money related variables
-money_amount = 614 # Default money amount
-currency = "€" # Default currency symbol
-reserve_at_end_of_month = 0 # Amount to reserve at the end of the month
-daily_allowance = money_amount / 30
+# TODO: Load spendings from a file or database, also calculate for CZK or EUR independently
+def get_days_left_in_curr_month() -> int:
+    today = date.today()
+    year = today.year
+    month = today.month
+    day = today.day
+    days_in_month = calendar.monthrange(year, month)[1]
+    return days_in_month - day + 1 # +1 to include today
+
+def get_days_in_curr_month() -> int:
+    today = date.today()
+    year = today.year
+    month = today.month
+    days_in_month = calendar.monthrange(year, month)[1]
+    return days_in_month
+
+app_states = {
+    "money_amount": 600,
+    "currency": "€",
+    "reserve_at_end_of_month": 200,
+    "days_left_in_month": get_days_left_in_curr_month(), # CURRENTLY NOT USED
+    "window_bg_color": "#CBCBCB",
+    "widget_border_color": "#000000",
+    "widget_fill_color": "#FFFFFF",
+    "widget_border_width": 2,
+    "padding_y": 2,
+    "is_fullscreen": False,
+    "is_dark_mode": False,
+    "dynamic_text_color": "#1B552F",  # This color is used for dynamic text (e.g., changing allowance)
+    "text_color": "#000000",  # Default text color (black for light mode)
+    "spendings": { "18.9.2025": {"item": "Pivo", "price": 50, "currency": "CZK"},
+                   "19.9.2025": {"item": "Burger", "price": 150, "currency": "CZK"}
+                  }
+}
+
 
 EXCHANGE_RATES = {
         "€": {"CZK": 24.32},
         "CZK": {"€": 1/24.32}
     }
 
+def get_padding_x():
+    return app_states["padding_y"] / (WINDOW_WIDTH / WINDOW_HEIGHT)
+
+def get(key):
+    return app_states[key]
+
+def set_state(key, value):
+    app_states[key] = value
+
+def calculate_money_conversion(money: float, currency_before: str, currency_after: str) -> float:
+    if currency_before == currency_after: return money
+    if currency_before not in EXCHANGE_RATES or currency_after not in EXCHANGE_RATES[currency_before]:
+        raise ValueError(f"Conversion rate from {currency_before} to {currency_after} not available.")
+    
+    conversion_rate = EXCHANGE_RATES[currency_before][currency_after]
+    print(conversion_rate)
+    return round(money * conversion_rate, 2)
+
+def calculate_daily_allowance(money_amount: float, reserve: float) -> float:
+    days_left = get_days_left_in_curr_month()
+    days_in_month = get_days_in_curr_month()
+    allowance_per_day = (money_amount - reserve) / days_in_month
+    print(app_states)
+    print(allowance_per_day)
+    return round(allowance_per_day * (days_in_month - days_left + 1), 2)
+
+
+
+
+
 # Window dimensions and scaling configurations
-WINDOW_SCALING_PERCENT = 75 # Percentage of screen size to use for window dimensions
+WINDOW_SCALING_PERCENT = 100 # Percentage of screen size to use for window dimensions
 WINDOW_WIDTH = root.winfo_screenwidth() * (WINDOW_SCALING_PERCENT / 100)
 WINDOW_HEIGHT = root.winfo_screenheight() * (WINDOW_SCALING_PERCENT / 100)
 WINDOW_X_CENTER = WINDOW_WIDTH / 2
@@ -31,54 +90,41 @@ ONE_PERCENT_WIDTH = WINDOW_WIDTH / 100
 
 # Text configurations
 FONT = 'Arial'
-text_color_dynamic = "#81FCAC" # This color changes based on dark mode or light mode
-text_color = "#000000" # Default text color (black for light mode)
 TEXT_SIZE_SMALL = 8
 TEXT_SIZE_NORMAL = 12
 TEXT_SIZE_LARGE = 16
 TEXT_SIZE_XLARGE = 20
 
-# Flags
-is_fullscreen = False
-is_dark_mode = False
+padding_x = get_padding_x()
+# Padding in percentages of window dimensions 
+# Padding x is calculated based on the aspect ratio of the window and padding_y to ensure consistent spacing.
 
 # Window configurations
-# Light mode and dark mode background colors
 TITLE = "Finanční Podpúrce 3000"
-window_bg_color = "#CBCBCB"
-widget_border_color = "#000000"
-widget_fill_color = "#FFFFFF"
-widget_border_width = 2
-padding_y = 1
-padding_x = padding_y / (WINDOW_WIDTH / WINDOW_HEIGHT)
-
-# Padding in percentages of window dimensions 
-# The padding is used to create space between the window border and the UI windows.
-# The padding is applied around each window so that the total padding added together is equal to the padding percentage.
-# Padding x is calculated based on the aspect ratio of the window and padding_y to ensure consistent spacing.
 
 # -------------------------------- #
 #       Application Window         #
 # -------------------------------- #
 
-canvas = Canvas(root, width = WINDOW_WIDTH, height = WINDOW_HEIGHT, bg = window_bg_color)
+canvas = Canvas(root, width = WINDOW_WIDTH, height = WINDOW_HEIGHT, bg = get("window_bg_color"))
 canvas.pack()
 
 def switch_dark_mode_colors(is_dark_mode: bool):
-    global window_bg_color, widget_border_color, text_color, widget_fill_color
     '''Switches the color scheme of the application between dark mode and light mode.'''
 
     if is_dark_mode:
-        window_bg_color = "#000000"
-        widget_fill_color = "#313131"
-        widget_border_color = "#FFFFFF"
-        text_color = "#FFFFFF"
+        set_state("window_bg_color", "#000000")
+        set_state("widget_fill_color", "#313131")
+        set_state("widget_border_color", "#FFFFFF")
+        set_state("text_color", "#FFFFFF")
+        set_state("dynamic_text_color", "#81FCAC")
     else:
-        window_bg_color = "#CBCBCB"
-        widget_fill_color = "#FFFFFF"
-        widget_border_color = "#000000"
-        text_color = "#000000"
-    canvas.config(bg=window_bg_color)
+        set_state("window_bg_color", "#CBCBCB")
+        set_state("widget_fill_color", "#FFFFFF")
+        set_state("widget_border_color", "#000000")
+        set_state("text_color", "#000000")
+        set_state("dynamic_text_color", "#1F5236")
+    canvas.config(bg=get("window_bg_color"))
     redraw_ui()
 
 def center_screen():
@@ -94,30 +140,29 @@ def center_screen():
     TM = ' (Samuel Ondroš 2025 ©)'
     root.title(TITLE + TM)
 
-root.attributes("-fullscreen", is_fullscreen)
+root.attributes("-fullscreen", get("is_fullscreen"))
 
 def toggle_fullscreen(event):
     '''Toggles fullscreen mode for the application window.
     Args:
         event (tkinter.Event): The event that triggered fullscreen toggle.
     '''
-    global is_fullscreen
-    is_fullscreen = not is_fullscreen 
-    root.attributes("-fullscreen", is_fullscreen)
+    set_state("is_fullscreen", not get("is_fullscreen"))
+    root.attributes("-fullscreen", get("is_fullscreen"))
 
 def toggle_dark_mode(event):
     '''Toggles dark mode for the application window.
     Args:
         event (tkinter.Event): The event that triggered dark mode toggle.
     '''
-    global is_dark_mode
-    is_dark_mode = not is_dark_mode
-    switch_dark_mode_colors(is_dark_mode)
+    set_state("is_dark_mode", not get("is_dark_mode"))
+    switch_dark_mode_colors(get("is_dark_mode"))
 
 def redraw_ui():
-    global is_dark_mode, padding_x, padding_y
     # Clear the canvas and redraw all UI elements with updated colors.
     # TODO: Implement UI redraw logic.
+    padding_x = get_padding_x()
+    padding_y = get("padding_y")
     create_allowance_window(padding_x, padding_y)
 
 def create_allowance_window(padding_x, padding_y):
@@ -130,9 +175,9 @@ def create_allowance_window(padding_x, padding_y):
     x2 = x1 + width - (padding_x * ONE_PERCENT_WIDTH / 2)
     y2 = y1 + height - (padding_y * ONE_PERCENT_HEIGHT / 2)
     main_rect_id = canvas.create_rectangle(x1, y1, x2, y2, 
-                            fill=widget_fill_color,
-                            outline=widget_border_color,
-                            width=widget_border_width,
+                            fill=get("widget_fill_color"),
+                            outline=get("widget_border_color"),
+                            width=get("widget_border_width"),
                             tag="allowance_window",
                             )
 
@@ -144,9 +189,9 @@ def create_allowance_label(x1: float, x2: float, y1: float, y2: float, main_rect
     y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_label)
     # Label background
     canvas.create_rectangle(x1, y1, x2, y2_label,
-                            fill=widget_fill_color,
-                            outline=widget_border_color,
-                            width=widget_border_width,
+                            fill=get("widget_fill_color"),
+                            outline=get("widget_border_color"),
+                            width=get("widget_border_width"),
                             tag="allowance")
     
     # Centered text inside the label
@@ -154,7 +199,7 @@ def create_allowance_label(x1: float, x2: float, y1: float, y2: float, main_rect
                        text="Daily allowance:", 
                        tag="allowance",
                        font=(FONT, TEXT_SIZE_LARGE),
-                       fill=text_color)
+                       fill=get("text_color"))
 
     create_allowance_currency(x1, x2, y1, y2_label, main_rect_id)
 
@@ -167,41 +212,36 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
     y1_currency = y2
     y2_currency = y1_currency + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_currency)
     canvas.create_rectangle(x1, y1_currency, x2, y2_currency,
-                            fill=widget_fill_color,
-                            outline=widget_border_color,
-                            width=widget_border_width,
+                            fill=get("widget_fill_color"),
+                            outline=get("widget_border_color"),
+                            width=get("widget_border_width"),
                             tag="allowance_currency")
 
     # Centered text inside the currency section
+    daily_allowance = calculate_daily_allowance(get("money_amount"), get("reserve_at_end_of_month"))
     canvas.create_text((x1 + x2) / 2, (y1_currency + y2_currency) / 2, 
-                       text=f'{daily_allowance} {currency}', 
+                       text=f'{daily_allowance} {get("currency")}', 
                        tag="allowance_currency",
                        font=(FONT, TEXT_SIZE_XLARGE),
-                       fill=text_color)
+                       fill=get("dynamic_text_color"))
     
-def calculate_money_conversion(money: float, currency_before: str, currency_after: str) -> float:
-    if currency_before == currency_after: return money
-    if currency_before not in EXCHANGE_RATES or currency_after not in EXCHANGE_RATES[currency_before]:
-        raise ValueError(f"Conversion rate from {currency_before} to {currency_after} not available.")
-    
-    conversion_rate = EXCHANGE_RATES[currency_before][currency_after]
-    print(conversion_rate)
-    return round(money * conversion_rate, 2)
+
 
 def switch_currency(event):
-    global currency, money_amount
-    if currency == "€":
+    if get("currency") == "€":
         new_currency = "CZK"
     else:
         new_currency = "€"
-    money_amount = calculate_money_conversion(money_amount, currency, new_currency)
-    currency = new_currency
+    money_amount = calculate_money_conversion(get("money_amount"), get("currency"), new_currency)
+    reserve_amount = calculate_money_conversion(get("reserve_at_end_of_month"), get("currency"), new_currency) 
+    set_state("currency", new_currency)
+    set_state("money_amount", money_amount)
+    set_state("reserve_at_end_of_month", reserve_amount)
     update_money_variables()
     redraw_ui()
 
 def update_money_variables():
     pass
-    daily_allowance = money_amount / 30
 
 def calculate_height_of_item(item_id: int) -> float:
     y1 = canvas.bbox(item_id)[1]
@@ -223,21 +263,18 @@ def calculate_height_in_percent(padding_y: float, percentage: float) -> float:
 
 def increase_padding(event):
     '''Increases the padding around UI elements.'''
-    global padding_x, padding_y
-    if padding_y < 10: # Limit maximum padding to 10%
-        padding_y += 0.5
-        padding_x = padding_y / (WINDOW_WIDTH / WINDOW_HEIGHT)
+    if get("padding_y") < 10: # Limit maximum padding to 10%
+        set_state("padding_y", get("padding_y") + 0.5)
         redraw_ui()
 
 def decrease_padding(event):
     '''Decreases the padding around UI elements.'''
-    global padding_x, padding_y
-    if padding_y > 0: # Limit minimum padding to 0%
-        padding_y -= 0.5
-        padding_x = padding_y / (WINDOW_WIDTH / WINDOW_HEIGHT)
+    if get("padding_y") > 0: # Limit minimum padding to 0%
+        set_state("padding_y", get("padding_y") - 0.5)
         redraw_ui()
+ 
 
-create_allowance_window(padding_x, padding_y)
+create_allowance_window(get_padding_x(), get("padding_y"))
 
 root.bind("w", increase_padding)
 root.bind("s", decrease_padding)
@@ -248,5 +285,6 @@ root.bind("<d>", toggle_dark_mode)
 
 root.bind("<C>", switch_currency)
 root.bind("<c>", switch_currency)
+
 center_screen()
 root.mainloop()
