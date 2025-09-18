@@ -1,0 +1,22 @@
+{
+    "budget": 500.0,
+    "currency": "\u20ac",
+    "reserve_at_end_of_month": 100.0,
+    "daily_allowance": 13.33,
+    "rolling_balance": 146.64,
+    "CZK_RATE": 24.32,
+    "days_left_in_month": 13,
+    "window_bg_color": "#CBCBCB",
+    "widget_border_color": "#000000",
+    "widget_fill_color": "#FFFFFF",
+    "widget_border_width": 2,
+    "widget_text_color": "#000000",
+    "padding_y": 1.5,
+    "WINDOW_SCALING_PERCENT": 100,
+    "is_fullscreen": false,
+    "is_dark_mode": false,
+    "dynamic_text_color": "#1F5236",
+    "reserve_text_color": "#FD3D3D",
+    "text_color": "#000000",
+    "spendings": {}
+}
