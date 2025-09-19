@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import messagebox # For displaying message boxes
 import json # For saving and loading settings
 from datetime import date
+from datetime import datetime
 import math 
 import calendar 
 import os # For checking if a file exists
@@ -11,7 +12,15 @@ spendings = 100
 
 # TODO: Load spendings from a file or database, also calculate for CZK or EUR independently
 
-FILE_PATH = "finance_data.json"
+FINANCE_DATA_PATH = "finance_data.json"
+FINANCE_TRANSACTIONS_PATH = "transactions.json"
+
+def get_current_time() -> str:
+    now = datetime.now()
+    hour = now.hour
+    minute = now.minute
+    second = now.second
+    return f'{hour}:{minute}:{second}'
 
 def get_days_left_in_curr_month() -> int:
     today = date.today()
@@ -28,7 +37,7 @@ def get_days_in_curr_month() -> int:
     days_in_month = calendar.monthrange(year, month)[1]
     return days_in_month
 
-def create_json_if_doesnt_exist(file_path=FILE_PATH):
+def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     default_app_states = {
     "budget": 500,
     "currency": "€",
@@ -42,6 +51,8 @@ def create_json_if_doesnt_exist(file_path=FILE_PATH):
     "widget_fill_color": "#FFFFFF",
     "widget_border_width": 2,
     "widget_text_color": "#000000",
+    "button_active_fg": "#222222",
+    "button_active_bg": "#E6E6E6",
     "padding_y": 1,
     "WINDOW_SCALING_PERCENT": 100, 
     "is_fullscreen": True,
@@ -49,27 +60,23 @@ def create_json_if_doesnt_exist(file_path=FILE_PATH):
     "dynamic_text_color": "#1B552F",  # This color is used for dynamic text (e.g., changing allowance)
     "reserve_text_color": "#FD3D3D",
     "text_color": "#000000",  # Default text color (black for light mode)
-    "spendings": {}
-    # "2025-09-18": {"item": "Pivo", "price": 50, "currency": "CZK"},
-    # "2025-09-19": {"item": "Burger", "price": 150, "currency": "CZK"}
-
 }
     if not os.path.exists(file_path):
         with open(file_path, 'w') as file:
             json.dump(default_app_states, file, indent=4)
 
-def load_app_states(file_path=FILE_PATH) -> dict:
+def load_app_states(file_path=FINANCE_DATA_PATH) -> dict:
     with open(file_path, 'r') as file:
         return json.load(file)
 
-def save_app_states(app_states: dict, file_path=FILE_PATH):
+def save_app_states(app_states: dict, file_path=FINANCE_DATA_PATH):
     # Uses atomic write to prevent data loss in the case of crashes mid-write
     temp_file_path = file_path[:file_path.index('.')] + ".tmp"
     with open(temp_file_path, 'w') as temp_file:
         json.dump(app_states, temp_file, indent=4)
     os.replace(temp_file_path, file_path)
 
-create_json_if_doesnt_exist()
+create_data_json_if_nonexistent()
 app_states = load_app_states()
 
 EXCHANGE_RATES = {
@@ -94,20 +101,22 @@ def calculate_money_conversion(money: float, currency_before: str, currency_afte
         raise ValueError(f"Conversion rate from {currency_before} to {currency_after} not available.")
     
     conversion_rate = EXCHANGE_RATES[currency_before][currency_after]
-    print(conversion_rate)
     return round(money * conversion_rate, 2)
+
+# TODO: Calculate daily allowance ONLY whenever the budget is changed!! 
+# Maybe create a function that initializes the budget (later)
 
 def calculate_daily_allowance(budget: float, reserve: float) -> float:
     days_in_month = get_days_in_curr_month()
     allowance_per_day = (budget - reserve) / days_in_month
-    return round(allowance_per_day, 2)
+    return allowance_per_day
 
 def set_daily_allowance():
     daily_allowance = calculate_daily_allowance(get_state("budget"), get_state("reserve_at_end_of_month"))
     set_state("daily_allowance", daily_allowance)
 
 def add_daily_allowance():
-    set_state("rolling_balance", round(get_state("rolling_balance") + get_state("daily_allowance"), 2))
+    set_state("rolling_balance", get_state("rolling_balance") + get_state("daily_allowance"))
 
 
 
@@ -153,6 +162,8 @@ def switch_dark_mode_colors(is_dark_mode: bool):
         set_state("text_color", "#FFFFFF")
         set_state("dynamic_text_color", "#81FCAC")
         set_state("widget_text_color", "#FFFFFF")
+        set_state("button_active_fg", "#FFFFFF")
+        set_state("button_active_bg", "#303030")
     else:
         set_state("window_bg_color", "#CBCBCB")
         set_state("widget_fill_color", "#FFFFFF")
@@ -160,8 +171,16 @@ def switch_dark_mode_colors(is_dark_mode: bool):
         set_state("text_color", "#000000")
         set_state("dynamic_text_color", "#1F5236")
         set_state("widget_text_color", "#000000")
+        set_state("button_active_fg", '#222222')
+        set_state("button_active_bg", '#E6E6E6')
+
     canvas.config(bg=get_state("window_bg_color"))
     redraw_ui()
+
+def format_number(num: float) -> str:
+    formatted_number = f'{num:,.2f}'
+    formatted_number = formatted_number.replace(',',' ').replace('.', ',')
+    return formatted_number
 
 def center_screen():
     '''Centers the application window on the user's screen and sets the window title.'''
@@ -198,6 +217,7 @@ def toggle_dark_mode(event):
 
 def redraw_ui():
     # Clear the canvas and redraw all UI elements with updated colors.
+    canvas.delete('success_text')
     padding_x = get_padding_x()
     padding_y = get_state("padding_y")
     create_windows(padding_x, padding_y)
@@ -257,7 +277,7 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
                             tag="allowance_currency")
 
     # Centered text inside the currency section
-    rolling_balance = get_state("rolling_balance")
+    rolling_balance = format_number(get_state("rolling_balance"))
     canvas.create_text((x1 + x2) / 2, (y1_currency + y2_currency) / 2, 
                        text=f'{rolling_balance} {get_state("currency")}', 
                        tag="allowance_currency",
@@ -265,7 +285,7 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
                        fill=get_state("dynamic_text_color"))
     
     # Text on the top right corner of the currency section indicating current daily allowance increase
-    daily_allowance = get_state("daily_allowance")
+    daily_allowance = format_number(get_state("daily_allowance"))
     canvas.create_text(x2 - 10, y1_currency + 10, 
                        text=f'Tomorrow: +{daily_allowance} {get_state("currency")}', 
                        tag="allowance_currency",
@@ -274,7 +294,7 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
                        anchor="ne")
     
     # Text on the top left corner of the currency section indicating budget
-    budget = get_state("budget")
+    budget = format_number(get_state("budget"))
     canvas.create_text(x1 + 10, y1_currency + 10,
                        text=f'Monthly budget: {budget} {get_state("currency")}',
                        tag="allowance_currency",
@@ -285,7 +305,7 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
     # Text on the bottom left corner of the currency section indicating reserve at end of month
     reserve = get_state("reserve_at_end_of_month")
     canvas.create_text(x1 + 10, y2_currency - 10,
-                       text=f'Monthly reserve: {reserve} {get_state("currency")}',
+                       text=f'Monthly reserve: {reserve:.2f} {get_state("currency")}',
                        tag="allowance_currency",
                        font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
                        fill=get_state("reserve_text_color"),
@@ -339,10 +359,14 @@ def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_
     y_middle = (y1 + y2) / 2
     y_one_fourth = y1 + (y2 - y1) / 4.5 # 4.5 just works ok
     y_one_eighth = y1 + (y2 - y1) / 8
-    y_three_fourths = y1 + (y2 - y1) * 0.4
+    y_two_fifths = y1 + (y2 - y1) * 0.4
+    y_three_fourths = y1 + (y2 - y1) * 0.75
+    y_bottom = y1 + (y2 - y1) * 0.9
     widget_width = (x2 - x1) / 2
     widget_height = (y2 - y1) / 8
-    print(y_one_fourth)
+
+    button_width = x1 / (8 + y1 / 25)
+    button_height = button_width
     # Item Name Entry Text Window:
     item_name_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                         bd=get_state("widget_border_width") + 2,
@@ -357,7 +381,7 @@ def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_
                       anchor = 'center',)
     transaction_widgets.append(item_name_entry)
 
-    # Text above the entry window:
+    # Text above the item entry window:
     canvas.create_text(x_middle, y_one_eighth, 
                        text="Transaction name:", 
                        tag="transaction_window",
@@ -377,26 +401,80 @@ def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_
                       anchor = 'center')
     transaction_widgets.append(price_entry)
 
-    # Text above the entry window:
-    canvas.create_text(x_middle, y_three_fourths, 
-                       text=f'Transaction price ({get_state("currency")}):', 
+    # Text above the price entry window:
+    canvas.create_text(x_middle, y_two_fifths, 
+                       text='Transaction price:', 
                        tag="transaction_window",
                        font=(FONT, TEXT_SIZE_NORMAL, BOLD),
                        fill=get_state("text_color"))
+    
+    x_currency_offset = widget_width / 2 + 10
+    # Currency text next to the price entry window:
+    canvas.create_text(x_middle + x_currency_offset, y_middle, 
+                       text=f'{get_state("currency")}', 
+                       tag="transaction_window",
+                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
+                       fill=get_state("text_color"),
+                       anchor="w")
 
-def add_transaction(item_name_entry, price_entry):
+    # Add Transaction Button (+)
+    add_tran_button = Button(root, text='+', justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_XLARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('widget_text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=lambda: add_transaction(item_name_entry, price_entry, x_middle, y_bottom))
+                             
+    add_tran_button.place(x = x_middle, y = y_three_fourths,
+                          width = button_width, height = button_height,
+                          anchor='center',)
+    transaction_widgets.append(add_tran_button)
+
+
+def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
     item_name = item_name_entry.get()
     price = price_entry.get()
-
+    price = price.replace(',','.') # Replace , with a . in case the user entered something like 20,45€
     # Check for edge cases:
     if not item_name or not price:
         messagebox.showerror("Error", "Please fill in all fields.")
-    try:
-        amount = float(amount)
-    except ValueError:
-        messagebox.showerror("Error", "Price must be a number.")
-        return
+        return None
+    else:
+        try:
+            price = float(price)
+            if math.isnan(price) or math.isinf(price): # Just in case a cheeky user tries to add inf, -inf or NaN
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Price must be a number.")
+            return None
+    if round(price, 2) <= 0:
+        messagebox.showerror("Error", "Price must be greater than 0.")
+        return None
     
+    today = date.today().isoformat()
+    current_time = get_current_time()
+    # Create transaction as a dictionary:
+    transaction = {"date": today, "time": current_time, "item": item_name, "price": price, "currency": get_state("currency")}
+    item_name_entry.delete(0, END)
+    price_entry.delete(0, END)
+
+    # Create success text confirming the item has been added
+    canvas.delete('success_text')
+    canvas.create_text(x_middle, y_bottom, 
+                       text=f'Your transaction has been added to the history.\nPrice: {format_number(price)} {get_state("currency")}',
+                       tag="success_text",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD),
+                       fill=get_state("dynamic_text_color"),
+                       anchor='center',
+                       justify='center')
+    # TODO: Add more meta-data so that in the future when a transaction gets reverted, the program knows
+    #       how much it took from the daily allowance and from the budget - then add it to the budget & daily allowance
+    #       and recalculate
+    print(transaction)
 
 def switch_currency(event):
     if get_state("currency") == "€":
@@ -463,13 +541,15 @@ root.bind("<c>", switch_currency)
 center_screen()
 root.mainloop()
 
-# TODO TODO!!!! MOST IMPORTANT!! SET UP A JSON FILE ASAP. CANT CONTINUE WITHOUT IT!
-
-# TODO: Add a way to log spendings and view them in a list, possibly with dates and categories.
-# TODO: When user adds a spending, check whether its larger than their rolling balance. If so, allow them to choose
-#       whether they want to reduce their rolling balance to the negatives, or let it impact the budget for the rest of the month.
-#       (in which case daily allowance would be reduced for the rest of the month)
-# TODO: Add a way to save and load user settings (budget, reserve, currency, dark mode preference, spendings) to/from a file.
+# TODO: Save transactions inside a separate transactions JSON file.
+# TODO: When implementing transaction history log, make sure to redraw it only if strictly necessary 
+#       (during conversions & light/darkmode changes)
+#       Possible optimization : load only the last 30 days of transactions, maybe even just 14 days
+# TODO: Add a way to log spendings and view them in a list, with dates.
+# TODO: When user adds a spending, check whether its larger than their rolling balance. If so, reset daily allowance to 0,
+#       and let the remainder of the spending cost impact the budget. Afterwards, re-calculate daily allowance based on days left
+#       in the month. 
+#       ALWAYS RECALCULATE DAILY ALLOWANCE INCREASE **ONLY IF** THE BUDGET CHANGES VALUE!!! 
 # TODO: Add a way to reset the rolling balance to the initial budget at the start of a new month.
 # TODO: Calculate rolling balance based on current date.
 # TODO: Add graphs to visualize spendings over time.
