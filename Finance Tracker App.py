@@ -17,10 +17,8 @@ FINANCE_TRANSACTIONS_PATH = "transactions.json"
 
 def get_current_time() -> str:
     now = datetime.now()
-    hour = now.hour
-    minute = now.minute
-    second = now.second
-    return f'{hour}:{minute}:{second}'
+    time = now.strftime('%H:%M:%S')
+    return time
 
 def get_days_left_in_curr_month() -> int:
     today = date.today()
@@ -61,13 +59,31 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "reserve_text_color": "#FD3D3D",
     "text_color": "#000000",  # Default text color (black for light mode)
 }
+    
     if not os.path.exists(file_path):
         with open(file_path, 'w') as file:
             json.dump(default_app_states, file, indent=4)
 
+def create_transaction_json_if_nonexistent(file_path=FINANCE_TRANSACTIONS_PATH):
+    default_transactions = {'next_txn_id': 1}
+    if not os.path.exists(file_path):
+        with open(file_path, 'w') as file:
+            json.dump(default_transactions, file, indent=4)
+
+def load_transactions(file_path=FINANCE_TRANSACTIONS_PATH):
+    with open(file_path, 'r', encoding='UTF-8') as file:
+        return json.load(file)
+
 def load_app_states(file_path=FINANCE_DATA_PATH) -> dict:
     with open(file_path, 'r') as file:
         return json.load(file)
+
+def save_transactions(transactions: dict, file_path = FINANCE_TRANSACTIONS_PATH):
+    # Uses atomic write to prevent data loss
+    temp_file_path = file_path[:file_path.index('.')] + '.tmp'
+    with open(temp_file_path, 'w', encoding='utf-8') as temp_file:
+        json.dump(transactions, temp_file, indent=4, ensure_ascii=False)
+    os.replace(temp_file_path, file_path)
 
 def save_app_states(app_states: dict, file_path=FINANCE_DATA_PATH):
     # Uses atomic write to prevent data loss in the case of crashes mid-write
@@ -76,8 +92,12 @@ def save_app_states(app_states: dict, file_path=FINANCE_DATA_PATH):
         json.dump(app_states, temp_file, indent=4)
     os.replace(temp_file_path, file_path)
 
+
+
 create_data_json_if_nonexistent()
+create_transaction_json_if_nonexistent()
 app_states = load_app_states()
+transactions = load_transactions()
 
 EXCHANGE_RATES = {
         "€": {"CZK": app_states["CZK_RATE"]},
@@ -458,10 +478,15 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
     today = date.today().isoformat()
     current_time = get_current_time()
     # Create transaction as a dictionary:
-    transaction = {"date": today, "time": current_time, "item": item_name, "price": price, "currency": get_state("currency")}
+    transaction_id = transactions['next_txn_id']
+    transaction = {"date": today, 
+                   "time": current_time, 
+                   "item": item_name, 
+                   "price": price, 
+                   "currency": get_state("currency")}
+    
     item_name_entry.delete(0, END)
     price_entry.delete(0, END)
-
     # Create success text confirming the item has been added
     canvas.delete('success_text')
     canvas.create_text(x_middle, y_bottom, 
@@ -474,7 +499,11 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
     # TODO: Add more meta-data so that in the future when a transaction gets reverted, the program knows
     #       how much it took from the daily allowance and from the budget - then add it to the budget & daily allowance
     #       and recalculate
-    print(transaction)
+    
+    # Add the transaction into transactions json with its own id:
+    transactions[f'txn_{transaction_id}'] = transaction
+    transactions['next_txn_id'] += 1
+    save_transactions(transactions)
 
 def switch_currency(event):
     if get_state("currency") == "€":
