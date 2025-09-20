@@ -104,8 +104,6 @@ EXCHANGE_RATES = {
         "CZK": {"€": 1/app_states["CZK_RATE"]}
     }
 
-
-
 def get_padding_x():
     return app_states["padding_y"] / (WINDOW_WIDTH / WINDOW_HEIGHT)
 
@@ -575,10 +573,12 @@ root.mainloop()
 #       (during conversions & light/darkmode changes)
 #       Possible optimization : load only the last 30 days of transactions, maybe even just 14 days
 # TODO: Add a way to log spendings and view them in a list, with dates.
-# TODO: When user adds a spending, check whether its larger than their rolling balance. If so, reset daily allowance to 0,
-#       and let the remainder of the spending cost impact the budget. Afterwards, re-calculate daily allowance based on days left
-#       in the month. 
-#       ALWAYS RECALCULATE DAILY ALLOWANCE INCREASE **ONLY IF** THE BUDGET CHANGES VALUE!!! 
+# TODO: When user adds a spending, check whether its larger than their rolling balance.
+#       if not, add the amount of spendings to pending_spendings variable.
+#       If yes, subtract pending_spendings + the remainder from price from budget.
+#       Afterwards, recalculate daily budget based on days left in the month. 
+#       ALWAYS RECALCULATE DAILY ALLOWANCE INCREASE **ONLY IF** THE BUDGET CHANGES VALUE!!!
+
 # TODO: Add a way to reset the rolling balance to the initial budget at the start of a new month.
 # TODO: Calculate rolling balance based on current date.
 # TODO: Add graphs to visualize spendings over time.
