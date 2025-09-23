@@ -4,7 +4,7 @@ import json # For saving and loading settings
 from datetime import date
 from datetime import datetime
 import math 
-import calendar 
+import calendar
 import os # For checking if a file exists
 
 root = Tk()
@@ -40,8 +40,10 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "budget": 500,
     "currency": "€",
     "reserve_at_end_of_month": 100,
+    "total_monthly_spendings": 0,
     "daily_allowance": 0, # calculated in code
     "rolling_balance": 0, # calculated in code
+    "pending_spendings": 0, # accumulates over time of daily balance spendings
     "CZK_RATE": 24.32,
     "days_left_in_month": get_days_left_in_curr_month(), # CURRENTLY NOT USED
     "window_bg_color": "#CBCBCB",
@@ -93,7 +95,6 @@ def save_app_states(app_states: dict, file_path=FINANCE_DATA_PATH):
     os.replace(temp_file_path, file_path)
 
 
-
 create_data_json_if_nonexistent()
 create_transaction_json_if_nonexistent()
 app_states = load_app_states()
@@ -119,14 +120,14 @@ def calculate_money_conversion(money: float, currency_before: str, currency_afte
         raise ValueError(f"Conversion rate from {currency_before} to {currency_after} not available.")
     
     conversion_rate = EXCHANGE_RATES[currency_before][currency_after]
-    return round(money * conversion_rate, 2)
+    return money * conversion_rate
 
 # TODO: Calculate daily allowance ONLY whenever the budget is changed!! 
 # Maybe create a function that initializes the budget (later)
 
 def calculate_daily_allowance(budget: float, reserve: float) -> float:
-    days_in_month = get_days_in_curr_month()
-    allowance_per_day = (budget - reserve) / days_in_month
+    days_left_in_month = get_days_left_in_curr_month()
+    allowance_per_day = (budget - reserve) / days_left_in_month
     return allowance_per_day
 
 def set_daily_allowance():
@@ -135,7 +136,6 @@ def set_daily_allowance():
 
 def add_daily_allowance():
     set_state("rolling_balance", get_state("rolling_balance") + get_state("daily_allowance"))
-
 
 
 # Window dimensions and scaling configurations
@@ -151,6 +151,7 @@ ONE_PERCENT_WIDTH = WINDOW_WIDTH / 100
 FONT = 'Arial'
 BOLD = 'bold'
 ITALIC = 'italic'
+TEXT_SIZE_XSMALL = round(9 / (100 / get_state("WINDOW_SCALING_PERCENT")))
 TEXT_SIZE_SMALL = round(10 / (100 / get_state("WINDOW_SCALING_PERCENT")))
 TEXT_SIZE_NORMAL = round(12 / (100 / get_state("WINDOW_SCALING_PERCENT")))
 TEXT_SIZE_LARGE = round(16 / (100 / get_state("WINDOW_SCALING_PERCENT")))
@@ -241,10 +242,63 @@ def redraw_ui():
     create_windows(padding_x, padding_y)
     save_app_states(app_states)
 
+HEIGHT_PERCENTAGE_LABEL = 12
+HEIGHT_PERCENTAGE_TRANS_LABEL = 12
+HEIGHT_PERCENTAGE_CURRENCY = 24
+
+def create_transaction_history_label(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    canvas.delete('trans')
+    main_rect_width = calculate_height_of_item(main_rect_id)
+    y2_label = y1 + (main_rect_width / 100 * HEIGHT_PERCENTAGE_LABEL)
+    y2_currency = y2_label + (main_rect_width / 100 * HEIGHT_PERCENTAGE_CURRENCY)
+    y2_trans = y2_currency + (main_rect_width / 100 * HEIGHT_PERCENTAGE_TRANS_LABEL)
+    canvas.create_rectangle(x1, y2_currency, x2, y2_trans, 
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag='trans')
+    
+    canvas.create_text((x1 + x2) / 2, (y2_currency + y2_trans) / 2, 
+                        text="Transaction history:", 
+                        tag="allowance",
+                        font=(FONT, TEXT_SIZE_LARGE),
+                        fill=get_state("text_color"))
+
+    create_transaction_history(x1, x2, y2_currency, y2_trans, main_rect_id)
+
+transaction_history_widgets = []
+visible_count = 14
+start_key = 0
+
+def create_transaction_history(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    global visible_count
+    global start_index
+    main_rect_y2 = canvas.bbox(main_rect_id)[3]
+    transaction_frame = Frame(root)
+    transaction_frame.place(x=x1 + 1, y=y2 + 1, width=(x2 - x1) - 2, height=(main_rect_y2 - y2) - 3)
+    num_of_transactions = len(transactions) - 1
+
+    for widget in transaction_history_widgets:
+        widget.destroy()
+    transaction_history_widgets.clear()
+    transaction_history_widgets.append(transaction_frame)
+    if num_of_transactions == 0: return None
+    #TODO: optimize if runs slowly
+
+    i = 0
+    for key, transaction in transactions.items():
+        if key == 'next_txn_id': continue
+        transaction = transactions[key]
+        label = Label(transaction_frame, text=transaction['item'], font=f'{FONT} {TEXT_SIZE_SMALL} {BOLD}')
+        label.pack(fill='x')
+        transaction_history_widgets.append(label)
+        i += 1
+        if i >= visible_count: break
+
 def create_windows(padding_x: float, padding_y: float):
     '''Creates windows of the app.'''
     canvas.delete('allowance_window') # Remove existing allowance window if it exists (to avoid duplicates when redrawing UI)
-    width = calculate_width_in_percent(padding_x, 40) # Width in percentages of window dimensions
+    width = calculate_width_in_percent(padding_x, 50) # Width in percentages of window dimensions
     height = calculate_height_in_percent(padding_y, 50) # Height in percentages of window dimensions
     x1 = ONE_PERCENT_WIDTH * padding_x
     y1 = ONE_PERCENT_HEIGHT * padding_y
@@ -259,11 +313,11 @@ def create_windows(padding_x: float, padding_y: float):
 
     create_allowance_label(x1, x2, y1, y2, main_rect_id)
     create_transaction_window(padding_x, padding_y, x1, y1, x2, y2)
+    create_transaction_history_label(x1, x2, y1, y2, main_rect_id)
 
 def create_allowance_label(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
     canvas.delete('allowance') # Remove existing allowance label if it exists (to avoid duplicates when redrawing UI)
-    height_percentage_label = 12
-    y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_label)
+    y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * HEIGHT_PERCENTAGE_LABEL)
     # Label background
     canvas.create_rectangle(x1, y1, x2, y2_label,
                             fill=get_state("widget_fill_color"),
@@ -285,9 +339,9 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
 
     # Currency section (rectangle below the label)
     canvas.delete('allowance_currency') # Remove existing allowance currency if it exists (to avoid duplicates when redrawing UI)
-    height_percentage_currency = 24 # Height of the currency section in percentages of the allowance window height
+    # Height of the currency section in percentages of the allowance window height
     y1_currency = y2
-    y2_currency = y1_currency + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_currency)
+    y2_currency = y1_currency + (calculate_height_of_item(main_rect_id) / 100 * HEIGHT_PERCENTAGE_CURRENCY)
     canvas.create_rectangle(x1, y1_currency, x2, y2_currency,
                             fill=get_state("widget_fill_color"),
                             outline=get_state("widget_border_color"),
@@ -312,13 +366,22 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
                        anchor="ne")
     
     # Text on the top left corner of the currency section indicating budget
-    budget = format_number(get_state("budget"))
+    budget = format_number(get_state("budget") - get_state("pending_spendings"))
     canvas.create_text(x1 + 10, y1_currency + 10,
-                       text=f'Monthly budget: {budget} {get_state("currency")}',
+                       text=f'Monthly budget left: {budget} {get_state("currency")}',
                        tag="allowance_currency",
                        font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
                        fill=get_state("dynamic_text_color"),
                        anchor="nw")
+
+    # Text on the top left corner of the currency section indicating pending spendings below the budget
+    total_spent = format_number(get_state("total_monthly_spendings"))
+    canvas.create_text(x2 - 10, y2_currency - 10,
+                       text=f'- {total_spent} {get_state("currency")} total spendings',
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_XSMALL, BOLD, ITALIC),
+                       fill=get_state("reserve_text_color"),
+                       anchor="se")
     
     # Text on the bottom left corner of the currency section indicating reserve at end of month
     reserve = get_state("reserve_at_end_of_month")
@@ -333,7 +396,7 @@ def create_transaction_window(padding_x: float, padding_y: float, x1_prev: float
     canvas.delete('transaction_window')
 
     # Create the transaction window
-    width = calculate_width_in_percent(padding_x, 30)
+    width = calculate_width_in_percent(padding_x, 25)
     height = calculate_height_in_percent(padding_y, 50)
     x1 = x2_prev + ONE_PERCENT_WIDTH * padding_x
     y1 = y1_prev
@@ -473,18 +536,54 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
         messagebox.showerror("Error", "Price must be greater than 0.")
         return None
     
+    if price > get_state("rolling_balance"):
+        messagebox.showwarning("Warning", "This transaction's price exceeds your daily allowance, meaning it will impact your future daily earnings.")
+    rolling_bal_before = app_states["rolling_balance"]
+    rolling_bal_after = max(0, rolling_bal_before - price) # Cap it at 0
+    rolling_bal_hit = rolling_bal_before - rolling_bal_after
+    set_state("pending_spendings", get_state("pending_spendings") + rolling_bal_hit) 
+    if price >= rolling_bal_before:
+        budget_hit = price - rolling_bal_before + get_state("pending_spendings")
+        set_state("pending_spendings", 0)
+        set_state("budget", app_states["budget"] - budget_hit)
+        set_daily_allowance()
+    else:
+        budget_hit = 0
+    # TODO: pending spendings likely will cause bugs later when deleting transactions, investigate
+    # TODO: convert pending spendings between CZK and eur
+    # TODO: fix bug where when a transaction in czk hits the allowance converting it back to eur and back to czk returns
+    # a smaller value
     today = date.today().isoformat()
     current_time = get_current_time()
     # Create transaction as a dictionary:
     transaction_id = transactions['next_txn_id']
-    transaction = {"date": today, 
+    transaction = {"date": today,
                    "time": current_time, 
                    "item": item_name, 
                    "price": price, 
-                   "currency": get_state("currency")}
+                   "currency": get_state("currency"),
+                   "czk_exchange_rate": get_state("CZK_RATE"),
+                   "rolling_bal_hit": rolling_bal_hit,
+                   "budget_hit": budget_hit}
     
     item_name_entry.delete(0, END)
     price_entry.delete(0, END)
+
+    # TODO: Add more meta-data so that in the future when a transaction gets reverted, the program knows
+    #       how much it took from the daily allowance and from the budget - then add it to the budget & daily allowance
+    #       and recalculate
+    
+    # Add the transaction into transactions json with its own id:
+    transactions[transaction_id] = transaction
+    transactions['next_txn_id'] += 1
+
+    # Subtract from rolling balance and/or budget:
+    set_state("rolling_balance", app_states["rolling_balance"] - rolling_bal_hit)
+    set_state("total_monthly_spendings", get_state("total_monthly_spendings") + price)
+    save_transactions(transactions)
+    save_app_states(app_states)
+    redraw_ui()
+    
     # Create success text confirming the item has been added
     canvas.delete('success_text')
     canvas.create_text(x_middle, y_bottom, 
@@ -494,14 +593,6 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
                        fill=get_state("dynamic_text_color"),
                        anchor='center',
                        justify='center')
-    # TODO: Add more meta-data so that in the future when a transaction gets reverted, the program knows
-    #       how much it took from the daily allowance and from the budget - then add it to the budget & daily allowance
-    #       and recalculate
-    
-    # Add the transaction into transactions json with its own id:
-    transactions[f'txn_{transaction_id}'] = transaction
-    transactions['next_txn_id'] += 1
-    save_transactions(transactions)
 
 def switch_currency(event):
     if get_state("currency") == "€":
@@ -511,10 +602,14 @@ def switch_currency(event):
     money_amount = calculate_money_conversion(get_state("budget"), get_state("currency"), new_currency)
     reserve_amount = calculate_money_conversion(get_state("reserve_at_end_of_month"), get_state("currency"), new_currency)
     rolling_balance = calculate_money_conversion(get_state("rolling_balance"), get_state("currency"), new_currency)
+    pending_spendings = calculate_money_conversion(get_state("pending_spendings"), get_state("currency"), new_currency)
+    total_monthly_spendings = calculate_money_conversion(get_state("total_monthly_spendings"), get_state("currency"), new_currency)
     set_state("currency", new_currency)
     set_state("budget", money_amount)
     set_state("reserve_at_end_of_month", reserve_amount)
     set_state("rolling_balance", rolling_balance)
+    set_state("pending_spendings", pending_spendings)
+    set_state("total_monthly_spendings", total_monthly_spendings)
     set_daily_allowance() # Recalculate daily allowance based on new budget and reserve amounts
     redraw_ui()
 

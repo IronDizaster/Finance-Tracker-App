@@ -1,38 +1,83 @@
 {
-    "next_txn_id": 6,
-    "txn_1": {
-        "date": "2025-09-20",
-        "time": "23:22:26",
-        "item": "Pivo",
+    "next_txn_id": 9,
+    "1": {
+        "date": "2025-09-24",
+        "time": "00:09:46",
+        "item": "4",
+        "price": 4.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0,
+        "budget_hit": 4.0
+    },
+    "2": {
+        "date": "2025-09-24",
+        "time": "00:16:28",
+        "item": "55",
+        "price": 5.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0,
+        "budget_hit": 5.0
+    },
+    "3": {
+        "date": "2025-09-24",
+        "time": "00:16:32",
+        "item": "pivo",
         "price": 52.0,
-        "currency": "CZK"
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0,
+        "budget_hit": 52.0
     },
-    "txn_2": {
-        "date": "2025-09-20",
-        "time": "23:22:58",
-        "item": "burgir",
-        "price": 290.0,
-        "currency": "CZK"
+    "4": {
+        "date": "2025-09-24",
+        "time": "00:17:48",
+        "item": "3091749120391207491207391207490124",
+        "price": 4.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0.0,
+        "budget_hit": 4.0
     },
-    "txn_3": {
-        "date": "2025-09-20",
-        "time": "23:23:12",
-        "item": "burgir",
-        "price": 20.0,
-        "currency": "€"
+    "5": {
+        "date": "2025-09-24",
+        "time": "00:17:59",
+        "item": "ANOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
+        "price": 3.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0.0,
+        "budget_hit": 3.0
     },
-    "txn_4": {
-        "date": "2025-09-20",
-        "time": "23:28:07",
-        "item": "kokot",
-        "price": 1.258849384,
-        "currency": "€"
+    "6": {
+        "date": "2025-09-24",
+        "time": "00:18:21",
+        "item": "5",
+        "price": 5.0,
+        "currency": "CZK",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0.0,
+        "budget_hit": 5.0
     },
-    "txn_5": {
-        "date": "2025-09-20",
-        "time": "23:29:04",
-        "item": "burgr",
-        "price": 12.3,
-        "currency": "€"
+    "7": {
+        "date": "2025-09-24",
+        "time": "00:28:01",
+        "item": "2",
+        "price": 0.01,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0.009999999999990905,
+        "budget_hit": 0
+    },
+    "8": {
+        "date": "2025-09-24",
+        "time": "00:28:08",
+        "item": "2",
+        "price": 0.01,
+        "currency": "CZK",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0.010000000000218279,
+        "budget_hit": 0
     }
 }
