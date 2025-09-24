@@ -1,83 +1,203 @@
 {
-    "next_txn_id": 9,
+    "next_txn_id": 21,
     "1": {
         "date": "2025-09-24",
-        "time": "00:09:46",
-        "item": "4",
-        "price": 4.0,
+        "time": "23:13:31",
+        "item": "1",
+        "price": 1.0,
         "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0,
-        "budget_hit": 4.0
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
     },
     "2": {
         "date": "2025-09-24",
-        "time": "00:16:28",
-        "item": "55",
-        "price": 5.0,
+        "time": "23:13:32",
+        "item": "1",
+        "price": 1.0,
         "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0,
-        "budget_hit": 5.0
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
     },
     "3": {
         "date": "2025-09-24",
-        "time": "00:16:32",
-        "item": "pivo",
-        "price": 52.0,
+        "time": "23:13:33",
+        "item": "1",
+        "price": 1.0,
         "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0,
-        "budget_hit": 52.0
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
     },
     "4": {
         "date": "2025-09-24",
-        "time": "00:17:48",
-        "item": "3091749120391207491207391207490124",
-        "price": 4.0,
+        "time": "23:13:34",
+        "item": "1",
+        "price": 1.0,
         "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0.0,
-        "budget_hit": 4.0
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
     },
     "5": {
         "date": "2025-09-24",
-        "time": "00:17:59",
-        "item": "ANOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO",
-        "price": 3.0,
+        "time": "23:13:35",
+        "item": "1",
+        "price": 1.0,
         "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0.0,
-        "budget_hit": 3.0
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
     },
     "6": {
         "date": "2025-09-24",
-        "time": "00:18:21",
-        "item": "5",
-        "price": 5.0,
-        "currency": "CZK",
+        "time": "23:13:36",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0.0,
-        "budget_hit": 5.0
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
     },
     "7": {
         "date": "2025-09-24",
-        "time": "00:28:01",
-        "item": "2",
-        "price": 0.01,
+        "time": "23:13:37",
+        "item": "1",
+        "price": 1.0,
         "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0.009999999999990905,
+        "rolling_bal_hit": 1.0,
         "budget_hit": 0
     },
     "8": {
         "date": "2025-09-24",
-        "time": "00:28:08",
-        "item": "2",
-        "price": 0.01,
-        "currency": "CZK",
+        "time": "23:13:38",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 0.010000000000218279,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "9": {
+        "date": "2025-09-24",
+        "time": "23:13:39",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "10": {
+        "date": "2025-09-24",
+        "time": "23:13:41",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "11": {
+        "date": "2025-09-24",
+        "time": "23:13:42",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "12": {
+        "date": "2025-09-24",
+        "time": "23:13:46",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "13": {
+        "date": "2025-09-24",
+        "time": "23:13:58",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "14": {
+        "date": "2025-09-24",
+        "time": "23:14:00",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "15": {
+        "date": "2025-09-24",
+        "time": "23:14:01",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "16": {
+        "date": "2025-09-24",
+        "time": "23:14:02",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "17": {
+        "date": "2025-09-24",
+        "time": "23:14:03",
+        "item": "1",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "18": {
+        "date": "2025-09-24",
+        "time": "23:14:04",
+        "item": "+",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "19": {
+        "date": "2025-09-24",
+        "time": "23:14:45",
+        "item": "+",
+        "price": 1.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 1.0,
+        "budget_hit": 0
+    },
+    "20": {
+        "date": "2025-09-24",
+        "time": "23:27:10",
+        "item": "Pivoooooooooooooooooooooooooo",
+        "price": 3.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 3.0,
         "budget_hit": 0
     }
 }

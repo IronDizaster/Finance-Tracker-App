@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import messagebox # For displaying message boxes
+from tkinter import font
 import json # For saving and loading settings
 from datetime import date
 from datetime import datetime
@@ -266,15 +267,23 @@ def create_transaction_history_label(x1: float, x2: float, y1: float, y2: float,
 
     create_transaction_history(x1, x2, y2_currency, y2_trans, main_rect_id)
 
+TRANSACTION_FONT = 'Consolas' # MUST BE MONOSPACE OTHERWISE EMPTY SPACE CALCULATING WILL FAIL
+TEXT_SIZE_TRANSACTION = TEXT_SIZE_NORMAL
+def get_width_of_text(font_to_use: str, text: str, text_size: str) -> int:
+    font_used = font.Font(family=font_to_use, size=text_size)
+    char_width = font_used.measure('0')
+    return len(text) * char_width
+
 transaction_history_widgets = []
-visible_count = 14
-start_key = 0
+visible_count = 10
+start_idx = 0
+
 
 def create_transaction_history(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
     global visible_count
     global start_index
     main_rect_y2 = canvas.bbox(main_rect_id)[3]
-    transaction_frame = Frame(root)
+    transaction_frame = Frame(root, bg=get_state('widget_fill_color'))
     transaction_frame.place(x=x1 + 1, y=y2 + 1, width=(x2 - x1) - 2, height=(main_rect_y2 - y2) - 3)
     num_of_transactions = len(transactions) - 1
 
@@ -286,14 +295,48 @@ def create_transaction_history(x1: float, x2: float, y1: float, y2: float, main_
     #TODO: optimize if runs slowly
 
     i = 0
-    for key, transaction in transactions.items():
-        if key == 'next_txn_id': continue
+    label_width = (x2 - x1) - 2
+    my_font = font.Font(family=TRANSACTION_FONT, size=TEXT_SIZE_TRANSACTION)
+    char_width = my_font.measure('0')
+    
+    txn_keys = [k for k in reversed(transactions) if k != 'next_txn_id']
+
+    for key in txn_keys[start_idx:start_idx + visible_count]:
+        
         transaction = transactions[key]
-        label = Label(transaction_frame, text=transaction['item'], font=f'{FONT} {TEXT_SIZE_SMALL} {BOLD}')
+        date = transaction["date"]
+        year = date[:4]
+        month = date[5:7]
+        day = date[8:]
+
+        date_text = f' {day}.{month}.{year} │ {transaction["time"][:-3]} │ ' 
+        date_text_length = get_width_of_text(TRANSACTION_FONT, date_text, TEXT_SIZE_TRANSACTION)
+
+        item_text = transaction["item"]
+        item_text_length = get_width_of_text(TRANSACTION_FONT, item_text, TEXT_SIZE_TRANSACTION)
+
+        empty_spaces_left = round(label_width - date_text_length) // char_width
+
+        price_text = f'  {format_number(transaction["price"])} {transaction["currency"]}'
+        price_text_length = get_width_of_text(TRANSACTION_FONT, price_text, TEXT_SIZE_TRANSACTION)
+
+        spaces_for_item_text = (empty_spaces_left - (price_text_length // char_width) - 4)
+
+        if item_text_length // char_width >= spaces_for_item_text:
+            item_text = item_text[:spaces_for_item_text] + '...'
+        else:
+            item_text = item_text + ' ' * (spaces_for_item_text - len(item_text) + 3)
+        label = Label(transaction_frame, 
+                      text=f'{date_text}{item_text}{price_text}', 
+                      font=f'{TRANSACTION_FONT} {TEXT_SIZE_TRANSACTION} {BOLD}',
+                      bg=get_state('window_bg_color'),
+                      fg=get_state('widget_text_color'),
+                      bd=2,
+                      relief='ridge',
+                      justify='left',
+                      anchor='w')
         label.pack(fill='x')
         transaction_history_widgets.append(label)
-        i += 1
-        if i >= visible_count: break
 
 def create_windows(padding_x: float, padding_y: float):
     '''Creates windows of the app.'''
@@ -647,6 +690,24 @@ def add(event):
     add_daily_allowance()
     redraw_ui()
 
+def scroll_transactions(event):
+    global start_idx
+    num_transactions = len(transactions) - 1
+    if num_transactions == 0: return
+    widget_under_mouse = root.winfo_containing(event.x_root, event.y_root)
+    if widget_under_mouse in transaction_history_widgets:
+        label_width = transaction_history_widgets[-1].winfo_width()
+        if event.delta < 0 and start_idx + visible_count < num_transactions:
+            transaction_history_widgets[1].destroy()
+            transaction_history_widgets.pop(1)
+            next_key = list(reversed([k for k in transactions if k != 'next_txn_id']))[start_idx + visible_count - 1]
+            transaction = transactions[next_key]
+            start_idx += 1
+            redraw_ui()
+        elif event.delta > 0 and start_idx > 0:
+            start_idx -= 1
+            redraw_ui()
+
 set_daily_allowance()
 create_windows(get_padding_x(), get_state("padding_y"))
 
@@ -659,7 +720,7 @@ root.bind("<d>", toggle_dark_mode)
 root.bind("a", add)
 root.bind("<C>", switch_currency)
 root.bind("<c>", switch_currency)
-
+root.bind("<MouseWheel>", scroll_transactions)
 center_screen()
 root.mainloop()
 
