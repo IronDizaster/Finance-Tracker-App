@@ -261,7 +261,7 @@ def create_transaction_history_label(x1: float, x2: float, y1: float, y2: float,
     
     canvas.create_text((x1 + x2) / 2, (y2_currency + y2_trans) / 2, 
                         text="Transaction history:", 
-                        tag="allowance",
+                        tag="trans",
                         font=(FONT, TEXT_SIZE_LARGE),
                         fill=get_state("text_color"))
 
@@ -275,58 +275,100 @@ def get_width_of_text(font_to_use: str, text: str, text_size: str) -> int:
     return len(text) * char_width
 
 transaction_history_widgets = []
-visible_count = 10
+visible_count = 9
 start_idx = 0
-
+SCROLLBAR_X_OFFSET = 25 
 
 def create_transaction_history(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
     global visible_count
     global start_index
     main_rect_y2 = canvas.bbox(main_rect_id)[3]
     transaction_frame = Frame(root, bg=get_state('widget_fill_color'))
-    transaction_frame.place(x=x1 + 1, y=y2 + 1, width=(x2 - x1) - 2, height=(main_rect_y2 - y2) - 3)
+    transaction_frame.place(x=x1 + 1, y=y2 + 1, width=(x2 - x1) - SCROLLBAR_X_OFFSET, height=(main_rect_y2 - y2) - 3)
     num_of_transactions = len(transactions) - 1
+    root.update_idletasks()
 
     for widget in transaction_history_widgets:
         widget.destroy()
     transaction_history_widgets.clear()
     transaction_history_widgets.append(transaction_frame)
+    draw_scrollbar()
     if num_of_transactions == 0: return None
     #TODO: optimize if runs slowly
 
-    i = 0
-    label_width = (x2 - x1) - 2
+    label_width = (x2 - x1) - SCROLLBAR_X_OFFSET
     my_font = font.Font(family=TRANSACTION_FONT, size=TEXT_SIZE_TRANSACTION)
     char_width = my_font.measure('0')
     
     txn_keys = [k for k in reversed(transactions) if k != 'next_txn_id']
 
     for key in txn_keys[start_idx:start_idx + visible_count]:
-        
         transaction = transactions[key]
-        date = transaction["date"]
-        year = date[:4]
-        month = date[5:7]
-        day = date[8:]
+        create_trnsc(transaction_frame, label_width, char_width, transaction)
 
-        date_text = f' {day}.{month}.{year} │ {transaction["time"][:-3]} │ ' 
-        date_text_length = get_width_of_text(TRANSACTION_FONT, date_text, TEXT_SIZE_TRANSACTION)
+def draw_scrollbar():
+    global start_idx
+    frame_width = transaction_history_widgets[0].winfo_width()
+    frame_x = transaction_history_widgets[0].winfo_x()
+    frame_y = transaction_history_widgets[0].winfo_y()
+    frame_height = transaction_history_widgets[0].winfo_height()
 
-        item_text = transaction["item"]
-        item_text_length = get_width_of_text(TRANSACTION_FONT, item_text, TEXT_SIZE_TRANSACTION)
+    x1 = frame_x + frame_width
+    y1 = frame_y - 1
+    x2 = frame_x + frame_width + SCROLLBAR_X_OFFSET - 1
+    y2 = frame_y + frame_height + 1
+    print(x1, y1, x2, y2)
+    # scrollbar border
+    canvas.create_rectangle(x1, y1, x2, y2,
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag='trans')
 
-        empty_spaces_left = round(label_width - date_text_length) // char_width
+    # scrollbar point
+    canvas.delete('scroll')
+    padding = 4
+    width = SCROLLBAR_X_OFFSET - 1
+    num_of_transactions = len(transactions) - 1
+    point_height = 40  # Set your desired constant height here
+    scroll_area = (y2 - y1) - point_height
+    max_scroll = max(1, num_of_transactions - visible_count + 1)
 
-        price_text = f'  {format_number(transaction["price"])} {transaction["currency"]}'
-        price_text_length = get_width_of_text(TRANSACTION_FONT, price_text, TEXT_SIZE_TRANSACTION)
+    if max_scroll == 1:
+        point_y = y1
+    else:
+        point_y = y1 + (scroll_area * start_idx / (max_scroll - 1))
 
-        spaces_for_item_text = (empty_spaces_left - (price_text_length // char_width) - 4)
+    canvas.create_rectangle(x1 + padding, point_y + padding, x1 + width - padding, point_y + point_height - padding,
+        fill=get_state("window_bg_color"),
+        outline=get_state("widget_border_color"),
+        width=get_state("widget_border_width"),
+        tag='scroll')
+    
+def create_trnsc(transaction_frame, label_width, char_width, transaction, before=None):
+    date = transaction["date"]
+    year = date[:4]
+    month = date[5:7]
+    day = date[8:]
 
-        if item_text_length // char_width >= spaces_for_item_text:
-            item_text = item_text[:spaces_for_item_text] + '...'
-        else:
-            item_text = item_text + ' ' * (spaces_for_item_text - len(item_text) + 3)
-        label = Label(transaction_frame, 
+    date_text = f' {day}.{month}.{year} │ {transaction["time"][:-3]} │ ' 
+    date_text_length = get_width_of_text(TRANSACTION_FONT, date_text, TEXT_SIZE_TRANSACTION)
+
+    item_text = transaction["item"]
+    item_text_length = get_width_of_text(TRANSACTION_FONT, item_text, TEXT_SIZE_TRANSACTION)
+
+    empty_spaces_left = round(label_width - date_text_length) // char_width
+
+    price_text = f'  {format_number(transaction["price"])} {transaction["currency"]}'
+    price_text_length = get_width_of_text(TRANSACTION_FONT, price_text, TEXT_SIZE_TRANSACTION)
+
+    spaces_for_item_text = (empty_spaces_left - (price_text_length // char_width) - 4)
+
+    if item_text_length // char_width >= spaces_for_item_text:
+        item_text = item_text[:spaces_for_item_text] + '...'
+    else:
+        item_text = item_text + ' ' * (spaces_for_item_text - len(item_text) + 3)
+    label = Label(transaction_frame, 
                       text=f'{date_text}{item_text}{price_text}', 
                       font=f'{TRANSACTION_FONT} {TEXT_SIZE_TRANSACTION} {BOLD}',
                       bg=get_state('window_bg_color'),
@@ -335,8 +377,13 @@ def create_transaction_history(x1: float, x2: float, y1: float, y2: float, main_
                       relief='ridge',
                       justify='left',
                       anchor='w')
-        label.pack(fill='x')
+    label.pack(fill='x', before=before)
+    root.update_idletasks()
+    if before == None:
         transaction_history_widgets.append(label)
+    else:
+        transaction_history_widgets.insert(1, label) 
+        # very very sloppy code but this is to account for scrolling up to optimize (terribleness)
 
 def create_windows(padding_x: float, padding_y: float):
     '''Creates windows of the app.'''
@@ -694,22 +741,36 @@ def scroll_transactions(event):
     global start_idx
     num_transactions = len(transactions) - 1
     if num_transactions == 0: return
+    label_width = transaction_history_widgets[1].winfo_width()
     widget_under_mouse = root.winfo_containing(event.x_root, event.y_root)
     if widget_under_mouse in transaction_history_widgets:
-        label_width = transaction_history_widgets[-1].winfo_width()
+        print(transaction_history_widgets)
+        print(label_width)
+        transaction_frame = transaction_history_widgets[0]
+        my_font = font.Font(family=TRANSACTION_FONT, size=TEXT_SIZE_TRANSACTION)
+        char_width = my_font.measure('0')
+
         if event.delta < 0 and start_idx + visible_count < num_transactions:
             transaction_history_widgets[1].destroy()
             transaction_history_widgets.pop(1)
-            next_key = list(reversed([k for k in transactions if k != 'next_txn_id']))[start_idx + visible_count - 1]
+            next_key = list(reversed([k for k in transactions if k != 'next_txn_id']))[start_idx + visible_count]
             transaction = transactions[next_key]
+            create_trnsc(transaction_frame, label_width, char_width, transaction)
             start_idx += 1
-            redraw_ui()
+            draw_scrollbar()
+
         elif event.delta > 0 and start_idx > 0:
             start_idx -= 1
-            redraw_ui()
+            draw_scrollbar()
+            transaction_history_widgets[-1].destroy()
+            transaction_history_widgets.pop(-1)
+            prev_key = list(reversed([k for k in transactions if k != 'next_txn_id']))[start_idx]
+            transaction = transactions[prev_key]
+            create_trnsc(transaction_frame, label_width, char_width, transaction, transaction_history_widgets[1])
 
 set_daily_allowance()
 create_windows(get_padding_x(), get_state("padding_y"))
+draw_scrollbar()
 
 root.bind("w", increase_padding)
 root.bind("s", decrease_padding)
