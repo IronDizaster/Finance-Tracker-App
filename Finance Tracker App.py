@@ -101,10 +101,6 @@ create_transaction_json_if_nonexistent()
 app_states = load_app_states()
 transactions = load_transactions()
 
-EXCHANGE_RATES = {
-        "€": {"CZK": app_states["CZK_RATE"]},
-        "CZK": {"€": 1/app_states["CZK_RATE"]}
-    }
 
 def get_padding_x():
     return app_states["padding_y"] / (WINDOW_WIDTH / WINDOW_HEIGHT)
@@ -115,12 +111,16 @@ def get_state(key):
 def set_state(key, value):
     app_states[key] = value
 
-def calculate_money_conversion(money: float, currency_before: str, currency_after: str) -> float:
+def calculate_money_conversion(money: float, currency_before: str, currency_after: str, exchange_rate=get_state('CZK_RATE')) -> float:
+    exchange_rates = {
+        "€": {"CZK": exchange_rate},
+        "CZK": {"€": 1/exchange_rate}
+    }
     if currency_before == currency_after: return money
-    if currency_before not in EXCHANGE_RATES or currency_after not in EXCHANGE_RATES[currency_before]:
+    if currency_before not in exchange_rates or currency_after not in exchange_rates[currency_before]:
         raise ValueError(f"Conversion rate from {currency_before} to {currency_after} not available.")
     
-    conversion_rate = EXCHANGE_RATES[currency_before][currency_after]
+    conversion_rate = exchange_rates[currency_before][currency_after]
     return money * conversion_rate
 
 # TODO: Calculate daily allowance ONLY whenever the budget is changed!! 
@@ -304,7 +304,7 @@ def create_transaction_history(x1: float, x2: float, y1: float, y2: float, main_
 
     for key in txn_keys[start_idx:start_idx + visible_count]:
         transaction = transactions[key]
-        create_trnsc(transaction_frame, label_width, char_width, transaction)
+        create_trnsc(key, transaction_frame, label_width, char_width, transaction)
 
 def draw_scrollbar():
     global start_idx
@@ -317,7 +317,6 @@ def draw_scrollbar():
     y1 = frame_y - 1
     x2 = frame_x + frame_width + SCROLLBAR_X_OFFSET - 1
     y2 = frame_y + frame_height + 1
-    print(x1, y1, x2, y2)
     # scrollbar border
     canvas.create_rectangle(x1, y1, x2, y2,
                             fill=get_state("widget_fill_color"),
@@ -344,8 +343,12 @@ def draw_scrollbar():
         outline=get_state("widget_border_color"),
         width=get_state("widget_border_width"),
         tag='scroll')
-    
-def create_trnsc(transaction_frame, label_width, char_width, transaction, before=None):
+
+selected_txn = None
+context_menu = Menu(root, tearoff=0)
+context_menu.add_command(label="Delete", command=lambda: delete_transaction(selected_txn))
+
+def create_trnsc(txn_key, transaction_frame, label_width, char_width, transaction, before=None):
     date = transaction["date"]
     year = date[:4]
     month = date[5:7]
@@ -378,12 +381,56 @@ def create_trnsc(transaction_frame, label_width, char_width, transaction, before
                       justify='left',
                       anchor='w')
     label.pack(fill='x', before=before)
-    root.update_idletasks()
+    label.update_idletasks()
+    label.txn_id = txn_key
+    label.bind("<Button-3>", lambda e, lbl = label: show_context_menu(e, lbl))
     if before == None:
         transaction_history_widgets.append(label)
     else:
         transaction_history_widgets.insert(1, label) 
         # very very sloppy code but this is to account for scrolling up to optimize (terribleness)
+
+def show_context_menu(event, label):
+    global selected_txn
+    selected_txn = label.txn_id
+    for l in transaction_history_widgets[1:]:
+        l.config(bg=get_state('window_bg_color'))
+    label.config(bg='lightblue')
+    context_menu.tk_popup(event.x_root, event.y_root)
+
+def delete_transaction(txn_id):
+    global start_idx
+    transaction = transactions[txn_id]
+    rolling_bal_hit = transaction['rolling_bal_hit']
+    budget_hit = transaction['budget_hit']
+    currency_used = transaction['currency']
+    czk_rate = transaction['czk_exchange_rate']
+
+    current_currency = get_state('currency')
+    price = transaction['price']
+    if currency_used != current_currency:
+        rolling_bal_hit = calculate_money_conversion(rolling_bal_hit, currency_used, current_currency, czk_rate)
+        budget_hit = calculate_money_conversion(budget_hit, currency_used, current_currency, czk_rate)
+        price = calculate_money_conversion(price, currency_used, current_currency, czk_rate)
+        print(rolling_bal_hit, budget_hit, price)
+
+    # Refund
+    set_state('budget', get_state('budget') + budget_hit)
+    set_state('rolling_balance', get_state('rolling_balance') + rolling_bal_hit)
+    # set_state('pending_spendings', max(0, get_state('pending_spendings') - rolling_bal_hit))
+    set_state('total_monthly_spendings', max(0, get_state('total_monthly_spendings') - price))
+
+    transactions.pop(txn_id, None)
+    # lord forgive me for this:
+    for i, label in enumerate(transaction_history_widgets):
+        if i == 0: continue
+        if label.txn_id == txn_id:
+            label.destroy()
+            transaction_history_widgets.pop(i)
+            break
+    if start_idx > 0: start_idx -= 1
+    save_transactions(transactions)
+    redraw_ui()
 
 def create_windows(padding_x: float, padding_y: float):
     '''Creates windows of the app.'''
@@ -744,8 +791,6 @@ def scroll_transactions(event):
     label_width = transaction_history_widgets[1].winfo_width()
     widget_under_mouse = root.winfo_containing(event.x_root, event.y_root)
     if widget_under_mouse in transaction_history_widgets:
-        print(transaction_history_widgets)
-        print(label_width)
         transaction_frame = transaction_history_widgets[0]
         my_font = font.Font(family=TRANSACTION_FONT, size=TEXT_SIZE_TRANSACTION)
         char_width = my_font.measure('0')
@@ -755,7 +800,7 @@ def scroll_transactions(event):
             transaction_history_widgets.pop(1)
             next_key = list(reversed([k for k in transactions if k != 'next_txn_id']))[start_idx + visible_count]
             transaction = transactions[next_key]
-            create_trnsc(transaction_frame, label_width, char_width, transaction)
+            create_trnsc(next_key, transaction_frame, label_width, char_width, transaction)
             start_idx += 1
             draw_scrollbar()
 
@@ -766,7 +811,7 @@ def scroll_transactions(event):
             transaction_history_widgets.pop(-1)
             prev_key = list(reversed([k for k in transactions if k != 'next_txn_id']))[start_idx]
             transaction = transactions[prev_key]
-            create_trnsc(transaction_frame, label_width, char_width, transaction, transaction_history_widgets[1])
+            create_trnsc(prev_key, transaction_frame, label_width, char_width, transaction, transaction_history_widgets[1])
 
 set_daily_allowance()
 create_windows(get_padding_x(), get_state("padding_y"))
@@ -784,17 +829,6 @@ root.bind("<c>", switch_currency)
 root.bind("<MouseWheel>", scroll_transactions)
 center_screen()
 root.mainloop()
-
-# TODO: Save transactions inside a separate transactions JSON file.
-# TODO: When implementing transaction history log, make sure to redraw it only if strictly necessary 
-#       (during conversions & light/darkmode changes)
-#       Possible optimization : load only the last 30 days of transactions, maybe even just 14 days
-# TODO: Add a way to log spendings and view them in a list, with dates.
-# TODO: When user adds a spending, check whether its larger than their rolling balance.
-#       if not, add the amount of spendings to pending_spendings variable.
-#       If yes, subtract pending_spendings + the remainder from price from budget.
-#       Afterwards, recalculate daily budget based on days left in the month. 
-#       ALWAYS RECALCULATE DAILY ALLOWANCE INCREASE **ONLY IF** THE BUDGET CHANGES VALUE!!!
 
 # TODO: Add a way to reset the rolling balance to the initial budget at the start of a new month.
 # TODO: Calculate rolling balance based on current date.
