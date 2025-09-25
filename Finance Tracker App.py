@@ -44,9 +44,8 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "total_monthly_spendings": 0,
     "daily_allowance": 0, # calculated in code
     "rolling_balance": 0, # calculated in code
-    "pending_spendings": 0, # accumulates over time of daily balance spendings
     "CZK_RATE": 24.32,
-    "days_left_in_month": get_days_left_in_curr_month(), # CURRENTLY NOT USED
+    "days_left_in_month": 30, # CURRENTLY NOT USED
     "window_bg_color": "#CBCBCB",
     "widget_border_color": "#000000",
     "widget_fill_color": "#FFFFFF",
@@ -127,8 +126,7 @@ def calculate_money_conversion(money: float, currency_before: str, currency_afte
 # Maybe create a function that initializes the budget (later)
 
 def calculate_daily_allowance(budget: float, reserve: float) -> float:
-    days_left_in_month = get_days_left_in_curr_month()
-    allowance_per_day = (budget - reserve) / days_left_in_month
+    allowance_per_day = (budget - reserve) / get_state('days_left_in_month')
     return allowance_per_day
 
 def set_daily_allowance():
@@ -136,7 +134,10 @@ def set_daily_allowance():
     set_state("daily_allowance", daily_allowance)
 
 def add_daily_allowance():
+    set_state('days_left_in_month', get_state('days_left_in_month') - 1)
     set_state("rolling_balance", get_state("rolling_balance") + get_state("daily_allowance"))
+    set_state("budget", get_state("budget") - get_state("daily_allowance"))
+    set_daily_allowance()
 
 
 # Window dimensions and scaling configurations
@@ -354,6 +355,7 @@ def create_trnsc(txn_key, transaction_frame, label_width, char_width, transactio
     month = date[5:7]
     day = date[8:]
 
+    budget_hit = transaction['budget_hit']
     date_text = f' {day}.{month}.{year} │ {transaction["time"][:-3]} │ ' 
     date_text_length = get_width_of_text(TRANSACTION_FONT, date_text, TEXT_SIZE_TRANSACTION)
 
@@ -361,8 +363,11 @@ def create_trnsc(txn_key, transaction_frame, label_width, char_width, transactio
     item_text_length = get_width_of_text(TRANSACTION_FONT, item_text, TEXT_SIZE_TRANSACTION)
 
     empty_spaces_left = round(label_width - date_text_length) // char_width
-
-    price_text = f'  {format_number(transaction["price"])} {transaction["currency"]}'
+    if budget_hit != 0:
+        budget_b = ' (B!)'
+    else:
+        budget_b = ''
+    price_text = f'  {format_number(transaction["price"])} {transaction["currency"]}{budget_b}'
     price_text_length = get_width_of_text(TRANSACTION_FONT, price_text, TEXT_SIZE_TRANSACTION)
 
     spaces_for_item_text = (empty_spaces_left - (price_text_length // char_width) - 4)
@@ -396,10 +401,15 @@ def show_context_menu(event, label):
     for l in transaction_history_widgets[1:]:
         l.config(bg=get_state('window_bg_color'))
     label.config(bg='lightblue')
-    context_menu.tk_popup(event.x_root, event.y_root)
+    try:
+        context_menu.tk_popup(event.x_root, event.y_root)
+    finally:
+        context_menu.grab_release()
+        label.config(bg=get_state("window_bg_color"))
 
 def delete_transaction(txn_id):
     global start_idx
+
     transaction = transactions[txn_id]
     rolling_bal_hit = transaction['rolling_bal_hit']
     budget_hit = transaction['budget_hit']
@@ -408,16 +418,22 @@ def delete_transaction(txn_id):
 
     current_currency = get_state('currency')
     price = transaction['price']
+
     if currency_used != current_currency:
         rolling_bal_hit = calculate_money_conversion(rolling_bal_hit, currency_used, current_currency, czk_rate)
         budget_hit = calculate_money_conversion(budget_hit, currency_used, current_currency, czk_rate)
         price = calculate_money_conversion(price, currency_used, current_currency, czk_rate)
         print(rolling_bal_hit, budget_hit, price)
 
+    if budget_hit > 0:
+        budget_refund_text = f' and add {format_number(budget_hit)} {current_currency} to the budget'
+    else:
+        budget_refund_text = ''
+    result = messagebox.askyesno('Are you sure?', f'Deleting this transaction will refund you {format_number(rolling_bal_hit)} {current_currency} in daily allowance{budget_refund_text}. Deletion cannot be reverted!')
+    if result == False: return None
     # Refund
     set_state('budget', get_state('budget') + budget_hit)
     set_state('rolling_balance', get_state('rolling_balance') + rolling_bal_hit)
-    # set_state('pending_spendings', max(0, get_state('pending_spendings') - rolling_bal_hit))
     set_state('total_monthly_spendings', max(0, get_state('total_monthly_spendings') - price))
 
     transactions.pop(txn_id, None)
@@ -430,6 +446,7 @@ def delete_transaction(txn_id):
             break
     if start_idx > 0: start_idx -= 1
     save_transactions(transactions)
+    set_daily_allowance()
     redraw_ui()
 
 def create_windows(padding_x: float, padding_y: float):
@@ -503,7 +520,7 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
                        anchor="ne")
     
     # Text on the top left corner of the currency section indicating budget
-    budget = format_number(get_state("budget") - get_state("pending_spendings"))
+    budget = format_number(get_state("budget"))
     canvas.create_text(x1 + 10, y1_currency + 10,
                        text=f'Monthly budget left: {budget} {get_state("currency")}',
                        tag="allowance_currency",
@@ -678,10 +695,8 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
     rolling_bal_before = app_states["rolling_balance"]
     rolling_bal_after = max(0, rolling_bal_before - price) # Cap it at 0
     rolling_bal_hit = rolling_bal_before - rolling_bal_after
-    set_state("pending_spendings", get_state("pending_spendings") + rolling_bal_hit) 
     if price >= rolling_bal_before:
-        budget_hit = price - rolling_bal_before + get_state("pending_spendings")
-        set_state("pending_spendings", 0)
+        budget_hit = price - rolling_bal_before
         set_state("budget", app_states["budget"] - budget_hit)
         set_daily_allowance()
     else:
@@ -739,13 +754,11 @@ def switch_currency(event):
     money_amount = calculate_money_conversion(get_state("budget"), get_state("currency"), new_currency)
     reserve_amount = calculate_money_conversion(get_state("reserve_at_end_of_month"), get_state("currency"), new_currency)
     rolling_balance = calculate_money_conversion(get_state("rolling_balance"), get_state("currency"), new_currency)
-    pending_spendings = calculate_money_conversion(get_state("pending_spendings"), get_state("currency"), new_currency)
     total_monthly_spendings = calculate_money_conversion(get_state("total_monthly_spendings"), get_state("currency"), new_currency)
     set_state("currency", new_currency)
     set_state("budget", money_amount)
     set_state("reserve_at_end_of_month", reserve_amount)
     set_state("rolling_balance", rolling_balance)
-    set_state("pending_spendings", pending_spendings)
     set_state("total_monthly_spendings", total_monthly_spendings)
     set_daily_allowance() # Recalculate daily allowance based on new budget and reserve amounts
     redraw_ui()
