@@ -2,7 +2,7 @@ from tkinter import *
 from tkinter import messagebox # For displaying message boxes
 from tkinter import font
 import json # For saving and loading settings
-from datetime import date
+from datetime import date, timedelta
 from datetime import datetime
 import math 
 import calendar
@@ -11,7 +11,8 @@ import os # For checking if a file exists
 root = Tk()
 spendings = 100
 
-# TODO: Load spendings from a file or database, also calculate for CZK or EUR independently
+# Please note a lot of the code had to be rushed due to time constraints, which is why some of it is
+# so spaghetti :)
 
 FINANCE_DATA_PATH = "finance_data.json"
 FINANCE_TRANSACTIONS_PATH = "transactions.json"
@@ -36,6 +37,9 @@ def get_days_in_curr_month() -> int:
     days_in_month = calendar.monthrange(year, month)[1]
     return days_in_month
 
+def get_days_in_month(month: int, year: int) -> int:
+    return calendar.monthrange(year, month)[1]
+
 def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     default_app_states = {
     "budget": 500,
@@ -53,6 +57,9 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "widget_text_color": "#000000",
     "button_active_fg": "#222222",
     "button_active_bg": "#E6E6E6",
+    "current_month": 0, # calculated in code
+    "current_year": 0, # calculated in code
+    "current_day": 0, # calculated in code
     "padding_y": 1,
     "WINDOW_SCALING_PERCENT": 100, 
     "is_fullscreen": True,
@@ -61,6 +68,7 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "reserve_text_color": "#FD3D3D",
     "text_color": "#000000",  # Default text color (black for light mode)
 }
+    # TODO: update current_month, current year and current day on app start
     
     if not os.path.exists(file_path):
         with open(file_path, 'w') as file:
@@ -239,6 +247,7 @@ def toggle_dark_mode(event):
 def redraw_ui():
     # Clear the canvas and redraw all UI elements with updated colors.
     canvas.delete('success_text')
+    canvas.delete('tooltip')
     padding_x = get_padding_x()
     padding_y = get_state("padding_y")
     create_windows(padding_x, padding_y)
@@ -423,7 +432,6 @@ def delete_transaction(txn_id):
         rolling_bal_hit = calculate_money_conversion(rolling_bal_hit, currency_used, current_currency, czk_rate)
         budget_hit = calculate_money_conversion(budget_hit, currency_used, current_currency, czk_rate)
         price = calculate_money_conversion(price, currency_used, current_currency, czk_rate)
-        print(rolling_bal_hit, budget_hit, price)
 
     if budget_hit > 0:
         budget_refund_text = f' and add {format_number(budget_hit)} {current_currency} to the budget'
@@ -449,6 +457,253 @@ def delete_transaction(txn_id):
     set_daily_allowance()
     redraw_ui()
 
+def set_year():
+    today = datetime.today()
+    set_state('current_year', today.year)
+
+def set_month():
+    today = datetime.today()
+    set_state('current_month', today.month)
+
+set_month()
+set_year()
+# TODO: Check if new month is different from previous month in each 2 of these functions!!!!!
+
+month_to_show = get_state("current_month")
+year_to_show = get_state("current_year")
+
+bar_tooltip_id = None
+rect_tooltip_id = None
+# 603
+def on_enter(event):
+    global bar_tooltip_id
+    global rect_tooltip_id
+    c = event.widget
+    bar_id = c.find_withtag("current")[0]
+    tags = c.gettags(bar_id)
+    price_tag = tags[1]
+    price_tag_f = price_tag.replace(',', '.')
+    price_tag_f = price_tag_f[:price_tag_f.index(' ')]
+    if event.x > WINDOW_WIDTH * 0.75:
+        anchor = 'ne'
+        x_offset = -10
+    else:
+        anchor = 'nw'
+        x_offset = 10
+
+    if float(price_tag_f) > get_state('daily_allowance'):
+        text_clr = get_state('reserve_text_color')
+    else:
+        text_clr = get_state('dynamic_text_color')
+    bar_tooltip_id = c.create_text(event.x + x_offset, event.y + 20,
+                                        text=f'{price_tag}',
+                                        anchor=anchor,
+                                        fill=text_clr,
+                                        font=f'{FONT} {TEXT_SIZE_SMALL} {BOLD} {ITALIC}',
+                                        tag = 'tooltip')
+    bbox = c.bbox(bar_tooltip_id)
+    rect_tooltip_id = c.create_rectangle(bbox, 
+                                              fill=get_state('widget_fill_color'), 
+                                              outline=text_clr, 
+                                              tag='tooltip')
+    canvas.tag_raise(bar_tooltip_id, rect_tooltip_id)
+    #c.create_rectangle()
+def on_leave(event):
+    global bar_tooltip_id
+    global rect_tooltip_id
+    if bar_tooltip_id:
+        canvas.delete('tooltip')
+        event.widget.delete(bar_tooltip_id)
+        event.widget.delete(rect_tooltip_id)
+        rect_tooltip_id = None
+        bar_tooltip_id = None
+def on_motion(event):
+    global bar_tooltip_id
+    global rect_tooltip_id
+    if bar_tooltip_id:
+        event.widget.coords(bar_tooltip_id, event.x, event.y + 20)
+    if rect_tooltip_id:
+        bbox = canvas.bbox(bar_tooltip_id)
+        event.widget.coords(rect_tooltip_id, bbox)
+
+def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    # OH GOD MONSTER FUNCTION INBOUND I REPEAT MO
+    canvas.delete('graph')
+    canvas.delete('bar')
+    canvas.delete('white_line')
+    canvas.delete('line_cost')
+    canvas.delete('bar_cost')
+    width = calculate_width_in_percent(padding_x, 100)
+    height = calculate_height_in_percent(padding_y, 44.5)
+    height_header = calculate_height_in_percent(0, 5.5)
+    x1_g = ONE_PERCENT_WIDTH * padding_x
+    y1_g = height * 1.247191011235955 + ONE_PERCENT_HEIGHT * padding_y
+    x2_g = width
+    y2_g = height * 2.247191011235955 + ONE_PERCENT_HEIGHT * padding_y
+    # .247191011235955 because 100 / 44.5 = (whatever).247191011235955
+    today = datetime.now()
+    current_day = today.day
+    current_month = today.month
+    current_year = today.year
+    month_num = month_to_show
+    months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    month_text = months[month_num - 1] 
+    
+    main_box = canvas.create_rectangle(x1_g, y1_g, x2_g, y2_g,
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag="graph",
+                            )
+    
+    header = canvas.create_rectangle(x1_g, y1_g - height_header, x2_g, y1_g, 
+                                     fill=get_state("widget_fill_color"),
+                                     outline=get_state("widget_border_color"),
+                                     width=get_state("widget_border_width"),
+                                     tag="graph",
+                                     )
+    canvas.create_text(abs(x1_g + x2_g) / 2, abs(2 * y1_g - height_header) / 2, 
+                       text=f'{month_text} {year_to_show}',
+                        tag="graph",
+                        font=(FONT, TEXT_SIZE_LARGE),
+                        fill=get_state("text_color"))
+    day_amount = get_days_in_month(month_to_show, year_to_show)
+    start_date = date(year_to_show, month_to_show, 1)
+    print(start_date)
+
+    date_range = [(start_date + timedelta(days=i)).isoformat() for i in range(day_amount)]
+    date_price_sums = {}
+
+    #print(date_range)
+    # Calculate how much money was spent on each day
+    current_currency = get_state('currency')
+    for key, transaction in transactions.items():
+        if key == 'next_txn_id': continue
+        txn_date = transaction['date']
+        if txn_date in date_range:
+            price = transaction['price']
+            trans_currency = transaction['currency']
+            exch_rate = transaction['czk_exchange_rate']
+            if trans_currency != current_currency:
+                price = calculate_money_conversion(price, trans_currency, current_currency, exch_rate)
+            if txn_date in date_price_sums.keys():
+                date_price_sums[txn_date] += price
+            else:
+                date_price_sums[txn_date] = price
+
+    w = calculate_width_of_item(main_box)
+    interval = w / (day_amount)
+    
+    print(interval)
+    x_offset = 3
+    y_offset = 17
+    total_budget = get_state('budget') + get_state('total_monthly_spendings') + get_state('rolling_balance') - get_state('reserve_at_end_of_month')
+    initial_max = total_budget / 8
+
+    if date_price_sums != {}:
+        highest_day_sum = max(list(date_price_sums.values()))
+    else:
+        highest_day_sum = 0
+    
+    max_graph_amount = max(initial_max, highest_day_sum)
+    min_lines = 8
+    max_lines = 18
+    min_amount = initial_max
+    max_amount = total_budget
+    
+    if max_amount == min_amount:
+        line_amount = min_lines
+    else:
+        scale = (max_graph_amount - min_amount) / (max_amount - min_amount)
+        scale = max(0, min(1, scale))  # Clamp between 0 and 1
+        line_amount = round(min_lines + (max_lines - min_lines) * scale)
+    height_interval = height / line_amount
+
+    for i, dates in enumerate(date_range):
+        day = dates[8:]
+        month = dates[5:7]
+        year = dates[:4]
+        if int(day) == current_day and int(month) == current_month and int(year) == current_year:
+            day_clr = get_state('reserve_text_color')
+        else:
+            day_clr = get_state('text_color')
+        canvas.create_text(x1_g + interval * i + interval / 2 - x_offset, y2_g - y_offset, 
+                           text=f'{day}.{month}', 
+                           tag='graph',
+                           font=f'{FONT} {TEXT_SIZE_XSMALL} {BOLD}',
+                           anchor='center',
+                           fill=day_clr)
+        if dates in date_price_sums.keys():
+            if date_price_sums[dates] > get_state('daily_allowance'):
+                fill_clr_bar = "#601A1A"
+                outline_bar = get_state('reserve_text_color')
+                if get_state('is_dark_mode') == False:
+                    outline_bar, fill_clr_bar = fill_clr_bar, outline_bar
+            else:
+                fill_clr_bar = "#83CC95"
+                outline_bar = get_state('dynamic_text_color')
+                if get_state('is_dark_mode') == True:
+                    fill_clr_bar = "#37954E"
+            bar_x1 = x1_g + interval * i - x_offset + interval * 0.2
+            bar_y1 = y2_g - height_interval
+            bar_x2 = x1_g + interval * i + interval - x_offset - interval * 0.2
+            bar_y2 = y2_g - height_interval - ((height - height_interval * 2) / max_graph_amount) * date_price_sums[dates]
+            bar = canvas.create_rectangle(bar_x1, bar_y1, bar_x2, bar_y2,
+                                    fill=fill_clr_bar,
+                                    width=get_state('widget_border_width'),
+                                    outline=outline_bar,
+                                    tag=('bar', f'{format_number(date_price_sums[dates])} {get_state("currency")}'))
+            
+            canvas.tag_bind(bar, "<Enter>", on_enter)
+            canvas.tag_bind(bar, "<Leave>", on_leave)
+            canvas.tag_bind(bar, "<Motion>", on_motion)
+
+    # creates lines and their text for spendings
+    for j in range(day_amount - 1):
+        canvas.create_line(x1_g - x_offset + interval * (j+1), 
+                           y2_g - 1, 
+                           x1_g - x_offset + interval * (j+1),
+                           y1_g + 1 + height_interval,
+                           tag='graph',
+                           fill = get_state('window_bg_color'),
+                           width = get_state('widget_border_width'))
+    
+    for i in range(line_amount - 1):
+        if i == 0: # First line:
+            fill_clr = get_state('widget_border_color')
+            fill_clr_text = "#474747" if get_state('is_dark_mode') == True else "#DCC5C5"
+            tag = 'white_line'
+        elif i == line_amount - 2: # Last line:
+            fill_clr = get_state('reserve_text_color')
+            fill_clr_text = get_state('reserve_text_color')
+            tag = 'graph'
+        else:
+            fill_clr = get_state('window_bg_color')
+            fill_clr_text = "#474747" if get_state('is_dark_mode') == True else "#DCC5C5"
+            tag = 'graph'
+        canvas.create_text(x2_g - x_offset, y2_g - height_interval * (i + 1) - y_offset, 
+                           text=f'{format_number((max_graph_amount / (line_amount - 2)) * i)} {get_state("currency")}',
+                           tag='line_cost',
+                           font=f'{FONT} {TEXT_SIZE_XSMALL} {BOLD} {ITALIC}',
+                           anchor='ne',
+                           fill=fill_clr_text)
+        
+        canvas.create_line(x1_g + 1, y2_g - height_interval * (i + 1), x2_g - 1, y2_g - height_interval * (i + 1),
+                           tag = tag,
+                           fill = fill_clr,
+                           width = get_state('widget_border_width'))
+    
+    # Create daily allowance line (below it = green)
+    y2_da = ((height - height_interval * 2) / max_graph_amount) * get_state('daily_allowance')
+    canvas.create_line(x1_g + 1, y2_g - height_interval - y2_da, x2_g - 1, y2_g - height_interval - y2_da,
+                       tag='graph',
+                       fill = get_state('dynamic_text_color'),
+                       width = get_state('widget_border_width'))
+    
+    canvas.tag_raise('bar')
+    canvas.tag_raise('white_line')
+    canvas.tag_raise('line_cost')
+    canvas.tag_raise('bar_cost')
 def create_windows(padding_x: float, padding_y: float):
     '''Creates windows of the app.'''
     canvas.delete('allowance_window') # Remove existing allowance window if it exists (to avoid duplicates when redrawing UI)
@@ -468,6 +723,7 @@ def create_windows(padding_x: float, padding_y: float):
     create_allowance_label(x1, x2, y1, y2, main_rect_id)
     create_transaction_window(padding_x, padding_y, x1, y1, x2, y2)
     create_transaction_history_label(x1, x2, y1, y2, main_rect_id)
+    create_graph(padding_x, padding_y, x1, x2, y1, y2, main_rect_id)
 
 def create_allowance_label(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
     canvas.delete('allowance') # Remove existing allowance label if it exists (to avoid duplicates when redrawing UI)
@@ -735,7 +991,7 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
     save_transactions(transactions)
     save_app_states(app_states)
     redraw_ui()
-    
+
     # Create success text confirming the item has been added
     canvas.delete('success_text')
     canvas.create_text(x_middle, y_bottom, 
@@ -826,6 +1082,28 @@ def scroll_transactions(event):
             transaction = transactions[prev_key]
             create_trnsc(prev_key, transaction_frame, label_width, char_width, transaction, transaction_history_widgets[1])
 
+def lower_graph_month(event):
+    global month_to_show
+    global year_to_show
+
+    if month_to_show == 1:
+        year_to_show -= 1
+        month_to_show = 12
+    else:
+        month_to_show -= 1
+    redraw_ui()
+
+def increase_graph_month(event):
+    global month_to_show
+    global year_to_show
+
+    if month_to_show == 12:
+        year_to_show += 1
+        month_to_show = 1
+    else:
+        month_to_show += 1
+    redraw_ui()
+
 set_daily_allowance()
 create_windows(get_padding_x(), get_state("padding_y"))
 draw_scrollbar()
@@ -840,6 +1118,8 @@ root.bind("a", add)
 root.bind("<C>", switch_currency)
 root.bind("<c>", switch_currency)
 root.bind("<MouseWheel>", scroll_transactions)
+root.bind("<Left>", lower_graph_month)
+root.bind("<Right>", increase_graph_month)
 center_screen()
 root.mainloop()
 
