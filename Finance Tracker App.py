@@ -270,7 +270,7 @@ def create_transaction_history_label(x1: float, x2: float, y1: float, y2: float,
                             tag='trans')
     
     canvas.create_text((x1 + x2) / 2, (y2_currency + y2_trans) / 2, 
-                        text="Transaction history:", 
+                        text="Transaction History", 
                         tag="trans",
                         font=(FONT, TEXT_SIZE_LARGE),
                         fill=get_state("text_color"))
@@ -475,6 +475,7 @@ year_to_show = get_state("current_year")
 bar_tooltip_id = None
 rect_tooltip_id = None
 # 603
+    
 def on_enter(event):
     global bar_tooltip_id
     global rect_tooltip_id
@@ -491,10 +492,7 @@ def on_enter(event):
         anchor = 'nw'
         x_offset = 10
 
-    if float(price_tag_f) > get_state('daily_allowance'):
-        text_clr = get_state('reserve_text_color')
-    else:
-        text_clr = get_state('dynamic_text_color')
+    text_clr = c.itemcget(bar_id, 'outline')
     bar_tooltip_id = c.create_text(event.x + x_offset, event.y + 20,
                                         text=f'{price_tag}',
                                         anchor=anchor,
@@ -634,16 +632,16 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
                            anchor='center',
                            fill=day_clr)
         if dates in date_price_sums.keys():
-            if date_price_sums[dates] > get_state('daily_allowance'):
-                fill_clr_bar = "#601A1A"
-                outline_bar = get_state('reserve_text_color')
-                if get_state('is_dark_mode') == False:
-                    outline_bar, fill_clr_bar = fill_clr_bar, outline_bar
-            else:
+            if date_price_sums[dates] < get_state('daily_allowance') and month_to_show == get_state('current_month') and year_to_show == get_state('current_year'):
                 fill_clr_bar = "#83CC95"
                 outline_bar = get_state('dynamic_text_color')
                 if get_state('is_dark_mode') == True:
                     fill_clr_bar = "#37954E"
+            else:
+                fill_clr_bar = "#601A1A"
+                outline_bar = get_state('reserve_text_color')
+                if get_state('is_dark_mode') == False:
+                    outline_bar, fill_clr_bar = fill_clr_bar, outline_bar
             bar_x1 = x1_g + interval * i - x_offset + interval * 0.2
             bar_y1 = y2_g - height_interval
             bar_x2 = x1_g + interval * i + interval - x_offset - interval * 0.2
@@ -694,149 +692,79 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
                            width = get_state('widget_border_width'))
     
     # Create daily allowance line (below it = green)
-    y2_da = ((height - height_interval * 2) / max_graph_amount) * get_state('daily_allowance')
-    canvas.create_line(x1_g + 1, y2_g - height_interval - y2_da, x2_g - 1, y2_g - height_interval - y2_da,
-                       tag='graph',
-                       fill = get_state('dynamic_text_color'),
-                       width = get_state('widget_border_width'))
+    # only on current month and year
+    if month_to_show == get_state('current_month') and year_to_show == get_state('current_year'):
+        y2_da = ((height - height_interval * 2) / max_graph_amount) * get_state('daily_allowance')
+        canvas.create_line(x1_g + 1, y2_g - height_interval - y2_da, x2_g - 1, y2_g - height_interval - y2_da,
+                           tag='graph',
+                           fill = get_state('dynamic_text_color'),
+                           width = get_state('widget_border_width'))
     
+    canvas.tag_raise('line_cost')
     canvas.tag_raise('bar')
     canvas.tag_raise('white_line')
-    canvas.tag_raise('line_cost')
-    canvas.tag_raise('bar_cost')
-def create_windows(padding_x: float, padding_y: float):
-    '''Creates windows of the app.'''
-    canvas.delete('allowance_window') # Remove existing allowance window if it exists (to avoid duplicates when redrawing UI)
-    width = calculate_width_in_percent(padding_x, 50) # Width in percentages of window dimensions
-    height = calculate_height_in_percent(padding_y, 50) # Height in percentages of window dimensions
-    x1 = ONE_PERCENT_WIDTH * padding_x
-    y1 = ONE_PERCENT_HEIGHT * padding_y
-    x2 = width
-    y2 = height
-    main_rect_id = canvas.create_rectangle(x1, y1, x2, y2, 
-                            fill=get_state("widget_fill_color"),
-                            outline=get_state("widget_border_color"),
-                            width=get_state("widget_border_width"),
-                            tag="allowance_window",
-                            )
 
-    create_allowance_label(x1, x2, y1, y2, main_rect_id)
-    create_transaction_window(padding_x, padding_y, x1, y1, x2, y2)
-    create_transaction_history_label(x1, x2, y1, y2, main_rect_id)
-    create_graph(padding_x, padding_y, x1, x2, y1, y2, main_rect_id)
-
-def create_allowance_label(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
-    canvas.delete('allowance') # Remove existing allowance label if it exists (to avoid duplicates when redrawing UI)
-    y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * HEIGHT_PERCENTAGE_LABEL)
-    # Label background
-    canvas.create_rectangle(x1, y1, x2, y2_label,
-                            fill=get_state("widget_fill_color"),
-                            outline=get_state("widget_border_color"),
-                            width=get_state("widget_border_width"),
-                            tag="allowance")
-    
-    # Centered text inside the label
-    canvas.create_text((x1 + x2) / 2, (y1 + y2_label) / 2, 
-                       text="Daily allowance:", 
-                       tag="allowance",
-                       font=(FONT, TEXT_SIZE_LARGE),
-                       fill=get_state("text_color"))
-
-    create_allowance_currency(x1, x2, y1, y2_label, main_rect_id)
-
-def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
-    '''Creates a section for displaying the currency of the allowance.'''
-
-    # Currency section (rectangle below the label)
-    canvas.delete('allowance_currency') # Remove existing allowance currency if it exists (to avoid duplicates when redrawing UI)
-    # Height of the currency section in percentages of the allowance window height
-    y1_currency = y2
-    y2_currency = y1_currency + (calculate_height_of_item(main_rect_id) / 100 * HEIGHT_PERCENTAGE_CURRENCY)
-    canvas.create_rectangle(x1, y1_currency, x2, y2_currency,
-                            fill=get_state("widget_fill_color"),
-                            outline=get_state("widget_border_color"),
-                            width=get_state("widget_border_width"),
-                            tag="allowance_currency")
-
-    # Centered text inside the currency section
-    rolling_balance = format_number(get_state("rolling_balance"))
-    canvas.create_text((x1 + x2) / 2, (y1_currency + y2_currency) / 2, 
-                       text=f'{rolling_balance} {get_state("currency")}', 
-                       tag="allowance_currency",
-                       font=(FONT, TEXT_SIZE_XLARGE, BOLD),
-                       fill=get_state("dynamic_text_color"))
-    
-    # Text on the top right corner of the currency section indicating current daily allowance increase
-    daily_allowance = format_number(get_state("daily_allowance"))
-    canvas.create_text(x2 - 10, y1_currency + 10, 
-                       text=f'Tomorrow: +{daily_allowance} {get_state("currency")}', 
-                       tag="allowance_currency",
-                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
-                       fill=get_state("dynamic_text_color"),
-                       anchor="ne")
-    
-    # Text on the top left corner of the currency section indicating budget
-    budget = format_number(get_state("budget"))
-    canvas.create_text(x1 + 10, y1_currency + 10,
-                       text=f'Monthly budget left: {budget} {get_state("currency")}',
-                       tag="allowance_currency",
-                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
-                       fill=get_state("dynamic_text_color"),
-                       anchor="nw")
-
-    # Text on the top left corner of the currency section indicating pending spendings below the budget
-    total_spent = format_number(get_state("total_monthly_spendings"))
-    canvas.create_text(x2 - 10, y2_currency - 10,
-                       text=f'- {total_spent} {get_state("currency")} total spendings',
-                       tag="allowance_currency",
-                       font=(FONT, TEXT_SIZE_XSMALL, BOLD, ITALIC),
-                       fill=get_state("reserve_text_color"),
-                       anchor="se")
-    
-    # Text on the bottom left corner of the currency section indicating reserve at end of month
-    reserve = get_state("reserve_at_end_of_month")
-    canvas.create_text(x1 + 10, y2_currency - 10,
-                       text=f'Monthly reserve: {reserve:.2f} {get_state("currency")}',
-                       tag="allowance_currency",
-                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
-                       fill=get_state("reserve_text_color"),
-                       anchor="sw")
-
-def create_transaction_window(padding_x: float, padding_y: float, x1_prev: float, y1_prev: float, x2_prev: float, y2_prev: float):
-    canvas.delete('transaction_window')
-
-    # Create the transaction window
+def create_toolbar(padding_x, padding_y, x1, x2, y1, y2):
+    canvas.delete('toolbar')
     width = calculate_width_in_percent(padding_x, 25)
     height = calculate_height_in_percent(padding_y, 50)
-    x1 = x2_prev + ONE_PERCENT_WIDTH * padding_x
-    y1 = y1_prev
-    x2 = x1 + width
-    y2 = y1 + height - ONE_PERCENT_HEIGHT * padding_y # Needs to be subtracted because it carries over from y1_prev
-    main_rect_id = canvas.create_rectangle(x1, y1, x2, y2, 
-                            fill=get_state("widget_fill_color"),
-                            outline=get_state("widget_border_color"),
-                            width=get_state("widget_border_width"),
-                            tag="transaction_window",
-                            )
+    x1_t = x1 + width + ONE_PERCENT_WIDTH * padding_x
+    y1_t = ONE_PERCENT_HEIGHT * padding_y
+    x2_t = x2 + width + ONE_PERCENT_WIDTH * padding_x
+    y2_t = y1_t + height - ONE_PERCENT_HEIGHT * padding_y
     
-    create_transaction_label(x1, y1, x2, y2, main_rect_id)
-
-def create_transaction_label(x1: float, y1: float, x2: float, y2: float, main_rect_id: int):
-    height_percentage_label = 12
-    y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_label)
-    canvas.create_rectangle(x1, y1, x2, y2_label,
+    main_rect_id = canvas.create_rectangle(x1_t, y1_t, x2_t, y2_t, 
+                            tag='toolbar',
                             fill=get_state("widget_fill_color"),
                             outline=get_state("widget_border_color"),
-                            width=get_state("widget_border_width"),
-                            tag="transaction_window",
-                            )
-    canvas.create_text((x1 + x2) / 2, (y1 + y2_label) / 2, 
-                       text="Add transaction:", 
-                       tag="transaction_window",
-                       font=(FONT, TEXT_SIZE_LARGE),
-                       fill=get_state("text_color"))
+                            width=get_state("widget_border_width"))
+    
+    header_y2 = y1 + (abs(y2_t - y1_t) / 100) * 12 # 24%
 
-    create_transaction_widgets(x1, y2_label, x2, y2, main_rect_id)
+    canvas.create_rectangle(x1_t, y1_t, x2_t, header_y2, 
+                            tag='toolbar',
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"))
+    # create header text
+    canvas.create_text((x1_t + x2_t) / 2, (header_y2 + y1_t) / 2, 
+                            text="Toolbar", 
+                            tag="toolbar",
+                            font=(FONT, TEXT_SIZE_LARGE),
+                            fill=get_state("text_color"))
+    
+    create_toolbar_widgets(x1_t, header_y2, x2_t, y2_t, main_rect_id)
+    
+
+toolbar_widgets = []
+def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
+    for widget in toolbar_widgets:
+        widget.destroy()
+    toolbar_widgets.clear()
+    
+    main_rect_height = y2 - y1
+    main_rect_width = x2 - x1
+
+    x_bdgt_labels = x1 + main_rect_width / 25
+    y_interval = main_rect_height / 5
+    y_budget_increase = y_interval
+
+    widget_width = main_rect_width / 2
+    widget_height = y_interval
+
+    budget_increase_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+                        bd=get_state("widget_border_width") + 2,
+                        relief='ridge',
+                        foreground=get_state("widget_text_color"),
+                        bg=get_state("window_bg_color"),
+                        insertbackground=get_state("widget_text_color"))
+    
+    budget_increase_entry.place(x = x_bdgt_labels, y = y_budget_increase,
+                      width = widget_width,
+                      height = widget_height,
+                      anchor = 'nw')
+    toolbar_widgets.append(budget_increase_entry)
+
 
 transaction_widgets = []
 def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_rect_id: int):
@@ -924,6 +852,143 @@ def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_
                           width = button_width, height = button_height,
                           anchor='center',)
     transaction_widgets.append(add_tran_button)
+
+def create_windows(padding_x: float, padding_y: float):
+    '''Creates windows of the app.'''
+    canvas.delete('allowance_window') # Remove existing allowance window if it exists (to avoid duplicates when redrawing UI)
+    width = calculate_width_in_percent(padding_x, 50) # Width in percentages of window dimensions
+    height = calculate_height_in_percent(padding_y, 50) # Height in percentages of window dimensions
+    x1 = ONE_PERCENT_WIDTH * padding_x
+    y1 = ONE_PERCENT_HEIGHT * padding_y
+    x2 = width
+    y2 = height
+    main_rect_id = canvas.create_rectangle(x1, y1, x2, y2, 
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag="allowance_window",
+                            )
+
+    create_allowance_label(x1, x2, y1, y2, main_rect_id)
+    create_transaction_window(padding_x, padding_y, x1, y1, x2, y2)
+    create_transaction_history_label(x1, x2, y1, y2, main_rect_id)
+    create_graph(padding_x, padding_y, x1, x2, y1, y2, main_rect_id)
+
+def create_allowance_label(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    canvas.delete('allowance') # Remove existing allowance label if it exists (to avoid duplicates when redrawing UI)
+    y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * HEIGHT_PERCENTAGE_LABEL)
+    # Label background
+    canvas.create_rectangle(x1, y1, x2, y2_label,
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag="allowance")
+    
+    # Centered text inside the label
+    canvas.create_text((x1 + x2) / 2, (y1 + y2_label) / 2, 
+                       text="Daily Allowance", 
+                       tag="allowance",
+                       font=(FONT, TEXT_SIZE_LARGE),
+                       fill=get_state("text_color"))
+
+    create_allowance_currency(x1, x2, y1, y2_label, main_rect_id)
+
+def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    '''Creates a section for displaying the currency of the allowance.'''
+
+    # Currency section (rectangle below the label)
+    canvas.delete('allowance_currency') # Remove existing allowance currency if it exists (to avoid duplicates when redrawing UI)
+    # Height of the currency section in percentages of the allowance window height
+    y1_currency = y2
+    y2_currency = y1_currency + (calculate_height_of_item(main_rect_id) / 100 * HEIGHT_PERCENTAGE_CURRENCY)
+    canvas.create_rectangle(x1, y1_currency, x2, y2_currency,
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag="allowance_currency")
+
+    # Centered text inside the currency section
+    rolling_balance = format_number(get_state("rolling_balance"))
+    canvas.create_text((x1 + x2) / 2, (y1_currency + y2_currency) / 2, 
+                       text=f'{rolling_balance} {get_state("currency")}', 
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_XLARGE, BOLD),
+                       fill=get_state("dynamic_text_color"))
+    
+    # Text on the top right corner of the currency section indicating current daily allowance increase
+    daily_allowance = format_number(get_state("daily_allowance"))
+    canvas.create_text(x2 - 10, y1_currency + 10, 
+                       text=f'Tomorrow: +{daily_allowance} {get_state("currency")}', 
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                       fill=get_state("dynamic_text_color"),
+                       anchor="ne")
+    
+    # Text on the top left corner of the currency section indicating budget
+    budget = format_number(get_state("budget"))
+    canvas.create_text(x1 + 10, y1_currency + 10,
+                       text=f'Monthly budget left: {budget} {get_state("currency")}',
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                       fill=get_state("dynamic_text_color"),
+                       anchor="nw")
+
+    # Text on the top left corner of the currency section indicating pending spendings below the budget
+    total_spent = format_number(get_state("total_monthly_spendings"))
+    canvas.create_text(x2 - 10, y2_currency - 10,
+                       text=f'- {total_spent} {get_state("currency")} total spendings',
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                       fill=get_state("reserve_text_color"),
+                       anchor="se")
+    
+    # Text on the bottom left corner of the currency section indicating reserve at end of month
+    reserve = get_state("reserve_at_end_of_month")
+    canvas.create_text(x1 + 10, y2_currency - 10,
+                       text=f'Monthly reserve: {reserve:.2f} {get_state("currency")}',
+                       tag="allowance_currency",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                       fill=get_state("reserve_text_color"),
+                       anchor="sw")
+
+def create_transaction_window(padding_x: float, padding_y: float, x1_prev: float, y1_prev: float, x2_prev: float, y2_prev: float):
+    canvas.delete('transaction_window')
+
+    # Create the transaction window
+    width = calculate_width_in_percent(padding_x, 25)
+    height = calculate_height_in_percent(padding_y, 50)
+    x1 = x2_prev + ONE_PERCENT_WIDTH * padding_x
+    y1 = y1_prev
+    x2 = x1 + width
+    y2 = y1 + height - ONE_PERCENT_HEIGHT * padding_y # Needs to be subtracted because it carries over from y1_prev
+    main_rect_id = canvas.create_rectangle(x1, y1, x2, y2, 
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag="transaction_window",
+                            )
+    
+    create_transaction_label(x1, y1, x2, y2, main_rect_id)
+    create_toolbar(padding_x, padding_y, x1, x2, y1, y2)
+
+def create_transaction_label(x1: float, y1: float, x2: float, y2: float, main_rect_id: int):
+    height_percentage_label = 12
+    y2_label = y1 + (calculate_height_of_item(main_rect_id) / 100 * height_percentage_label)
+    canvas.create_rectangle(x1, y1, x2, y2_label,
+                            fill=get_state("widget_fill_color"),
+                            outline=get_state("widget_border_color"),
+                            width=get_state("widget_border_width"),
+                            tag="transaction_window",
+                            )
+    canvas.create_text((x1 + x2) / 2, (y1 + y2_label) / 2, 
+                       text="Add Transaction", 
+                       tag="transaction_window",
+                       font=(FONT, TEXT_SIZE_LARGE),
+                       fill=get_state("text_color"))
+
+    create_transaction_widgets(x1, y2_label, x2, y2, main_rect_id)
+
+
 
 
 def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):

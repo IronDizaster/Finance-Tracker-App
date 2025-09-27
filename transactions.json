@@ -1,253 +1,53 @@
 {
-    "next_txn_id": 45,
-    "6": {
+    "next_txn_id": 10,
+    "5": {
         "date": "2025-09-27",
-        "time": "01:22:40",
-        "item": "Pivoo",
-        "price": 4.5,
-        "currency": "€",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 4.5,
-        "budget_hit": 0
-    },
-    "11": {
-        "date": "2025-10-21",
-        "time": "01:23:29",
-        "item": "t",
-        "price": 2.0,
-        "currency": "€",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 2.0,
-        "budget_hit": 0
-    },
-    "12": {
-        "date": "2025-09-22",
-        "time": "01:23:30",
-        "item": "t",
-        "price": 2.0,
-        "currency": "€",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 2.0,
-        "budget_hit": 0
-    },
-    "14": {
-        "date": "2025-09-23",
-        "time": "01:23:33",
+        "time": "17:13:36",
         "item": "3",
-        "price": 4.0,
-        "currency": "€",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 4.0,
-        "budget_hit": 0
-    },
-    "15": {
-        "date": "2025-09-23",
-        "time": "01:23:33",
-        "item": "3",
-        "price": 3.0,
-        "currency": "€",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 3.0,
-        "budget_hit": 0
-    },
-    "24": {
-        "date": "2025-09-22",
-        "time": "14:13:11",
-        "item": "3333",
-        "price": 121.36,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 121.36000000000058,
-        "budget_hit": 0
-    },
-    "26": {
-        "date": "2025-09-27",
-        "time": "15:12:49",
-        "item": "3",
-        "price": 15.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 15.0,
-        "budget_hit": 0
-    },
-    "27": {
-        "date": "2025-09-27",
-        "time": "15:20:54",
-        "item": "2",
-        "price": 12.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 12.0,
-        "budget_hit": 0
-    },
-    "28": {
-        "date": "2025-09-27",
-        "time": "15:20:56",
-        "item": "3",
-        "price": 333.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 333.0,
-        "budget_hit": 0
-    },
-    "29": {
-        "date": "2025-09-27",
-        "time": "15:28:40",
-        "item": "3",
-        "price": 3.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 3.0,
-        "budget_hit": 0
-    },
-    "30": {
-        "date": "2025-09-27",
-        "time": "15:28:45",
-        "item": "12",
-        "price": 12.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 12.0,
-        "budget_hit": 0
-    },
-    "31": {
-        "date": "2025-09-27",
-        "time": "15:28:51",
-        "item": "3",
-        "price": 333.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 333.0,
-        "budget_hit": 0
-    },
-    "32": {
-        "date": "2025-09-27",
-        "time": "15:28:52",
-        "item": "2",
-        "price": 2.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 2.0,
-        "budget_hit": 0
-    },
-    "33": {
-        "date": "2025-09-27",
-        "time": "15:28:53",
-        "item": "3",
-        "price": 2.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 2.0,
-        "budget_hit": 0
-    },
-    "34": {
-        "date": "2025-09-27",
-        "time": "15:28:54",
-        "item": "3",
-        "price": 3.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 3.0,
-        "budget_hit": 0
-    },
-    "35": {
-        "date": "2025-09-27",
-        "time": "15:28:55",
-        "item": "4",
-        "price": 4.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 4.0,
-        "budget_hit": 0
-    },
-    "36": {
-        "date": "2025-09-27",
-        "time": "15:28:56",
-        "item": "1",
-        "price": 2.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 2.0,
-        "budget_hit": 0
-    },
-    "37": {
-        "date": "2025-09-27",
-        "time": "15:28:57",
-        "item": "1",
-        "price": 3.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 3.0,
-        "budget_hit": 0
-    },
-    "38": {
-        "date": "2025-09-27",
-        "time": "15:28:59",
-        "item": "4",
-        "price": 2.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 2.0,
-        "budget_hit": 0
-    },
-    "39": {
-        "date": "2025-09-27",
-        "time": "15:29:00",
-        "item": "33",
         "price": 33.0,
-        "currency": "CZK",
+        "currency": "€",
         "czk_exchange_rate": 24.32,
         "rolling_bal_hit": 33.0,
         "budget_hit": 0
     },
-    "40": {
+    "6": {
         "date": "2025-09-27",
-        "time": "15:29:01",
+        "time": "17:13:38",
         "item": "2",
-        "price": 122.0,
-        "currency": "CZK",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 122.0,
-        "budget_hit": 0
-    },
-    "41": {
-        "date": "2025-09-27",
-        "time": "15:29:04",
-        "item": "3",
         "price": 2.0,
-        "currency": "CZK",
+        "currency": "€",
         "czk_exchange_rate": 24.32,
         "rolling_bal_hit": 2.0,
         "budget_hit": 0
     },
-    "42": {
+    "7": {
         "date": "2025-09-27",
-        "time": "15:29:05",
+        "time": "17:13:41",
+        "item": "1",
+        "price": 10.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 5.000000000000021,
+        "budget_hit": 4.999999999999979
+    },
+    "8": {
+        "date": "2025-09-27",
+        "time": "17:13:43",
+        "item": "3",
+        "price": 23.0,
+        "currency": "€",
+        "czk_exchange_rate": 24.32,
+        "rolling_bal_hit": 0.0,
+        "budget_hit": 23.0
+    },
+    "9": {
+        "date": "2025-09-27",
+        "time": "17:13:46",
         "item": "2",
         "price": 12.0,
         "currency": "€",
         "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 12.0,
-        "budget_hit": 0
-    },
-    "43": {
-        "date": "2025-09-27",
-        "time": "15:29:06",
-        "item": "ľ",
-        "price": 12.0,
-        "currency": "€",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 12.0,
-        "budget_hit": 0
-    },
-    "44": {
-        "date": "2025-09-27",
-        "time": "15:29:08",
-        "item": "2",
-        "price": 12.0,
-        "currency": "€",
-        "czk_exchange_rate": 24.32,
-        "rolling_bal_hit": 12.0,
-        "budget_hit": 0
+        "rolling_bal_hit": 0.0,
+        "budget_hit": 12.0
     }
 }
