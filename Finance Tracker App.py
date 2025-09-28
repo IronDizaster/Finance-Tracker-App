@@ -42,14 +42,14 @@ def get_days_in_month(month: int, year: int) -> int:
 
 def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     default_app_states = {
-    "budget": 500,
+    "budget": 0.001,
     "currency": "€",
-    "reserve_at_end_of_month": 100,
+    "reserve_at_end_of_month": 0,
     "total_monthly_spendings": 0,
     "daily_allowance": 0, # calculated in code
     "rolling_balance": 0, # calculated in code
     "CZK_RATE": 24.32,
-    "days_left_in_month": 30, # CURRENTLY NOT USED
+    "days_left_in_month": get_days_left_in_curr_month(), # CURRENTLY NOT USED
     "window_bg_color": "#CBCBCB",
     "widget_border_color": "#000000",
     "widget_fill_color": "#FFFFFF",
@@ -63,7 +63,7 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "padding_y": 1,
     "WINDOW_SCALING_PERCENT": 100, 
     "is_fullscreen": True,
-    "is_dark_mode": False,
+    "is_dark_mode": True,
     "dynamic_text_color": "#1B552F",  # This color is used for dynamic text (e.g., changing allowance)
     "reserve_text_color": "#FD3D3D",
     "text_color": "#000000",  # Default text color (black for light mode)
@@ -250,6 +250,7 @@ def redraw_ui():
     canvas.delete('tooltip')
     padding_x = get_padding_x()
     padding_y = get_state("padding_y")
+    set_daily_allowance()
     create_windows(padding_x, padding_y)
     save_app_states(app_states)
 
@@ -465,6 +466,11 @@ def set_month():
     today = datetime.today()
     set_state('current_month', today.month)
 
+def set_today():
+    today = datetime.today()
+    set_state('current_day', today.day)
+
+set_today()
 set_month()
 set_year()
 # TODO: Check if new month is different from previous month in each 2 of these functions!!!!!
@@ -524,7 +530,21 @@ def on_motion(event):
         bbox = canvas.bbox(bar_tooltip_id)
         event.widget.coords(rect_tooltip_id, bbox)
 
+graph_header_id = None
+def initiate_timer():
+    canvas.delete('timer')
+    current_time = get_current_time()
+    x1, y1, x2, y2 = canvas.coords(graph_header_id)
+    canvas.create_text(x2 - 10, y2 - abs(y1 - y2) / 2,
+                       text=current_time,
+                       anchor='e',
+                       tag="timer",
+                       font=(FONT, TEXT_SIZE_LARGE),
+                       fill=get_state("dynamic_text_color"))
+    canvas.after(1000, initiate_timer)
+    
 def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
+    global graph_header_id
     # OH GOD MONSTER FUNCTION INBOUND I REPEAT MO
     canvas.delete('graph')
     canvas.delete('bar')
@@ -554,17 +574,25 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
                             tag="graph",
                             )
     
-    header = canvas.create_rectangle(x1_g, y1_g - height_header, x2_g, y1_g, 
+    graph_header_id = canvas.create_rectangle(x1_g, y1_g - height_header, x2_g, y1_g, 
                                      fill=get_state("widget_fill_color"),
                                      outline=get_state("widget_border_color"),
                                      width=get_state("widget_border_width"),
-                                     tag="graph",
-                                     )
+                                     tag="graph")
+    
     canvas.create_text(abs(x1_g + x2_g) / 2, abs(2 * y1_g - height_header) / 2, 
-                       text=f'{month_text} {year_to_show}',
+                       text=f'{month_text} {year_to_show} Daily Spendings',
                         tag="graph",
                         font=(FONT, TEXT_SIZE_LARGE),
                         fill=get_state("text_color"))
+    
+    canvas.create_text(x1 + 10, abs(2 * y1_g - height_header) / 2,
+                       text=f"{get_state('current_day')}.{get_state('current_month')}.{get_state('current_year')}",
+                       anchor='w',
+                       tag="graph",
+                       font=(FONT, TEXT_SIZE_LARGE),
+                       fill=get_state("dynamic_text_color"))
+    initiate_timer()
     day_amount = get_days_in_month(month_to_show, year_to_show)
     start_date = date(year_to_show, month_to_show, 1)
     print(start_date)
@@ -596,7 +624,7 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
     x_offset = 3
     y_offset = 17
     total_budget = get_state('budget') + get_state('total_monthly_spendings') + get_state('rolling_balance') - get_state('reserve_at_end_of_month')
-    initial_max = total_budget / 8
+    initial_max = get_state('daily_allowance') * 4
 
     if date_price_sums != {}:
         highest_day_sum = max(list(date_price_sums.values()))
@@ -694,11 +722,12 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
     # Create daily allowance line (below it = green)
     # only on current month and year
     if month_to_show == get_state('current_month') and year_to_show == get_state('current_year'):
-        y2_da = ((height - height_interval * 2) / max_graph_amount) * get_state('daily_allowance')
-        canvas.create_line(x1_g + 1, y2_g - height_interval - y2_da, x2_g - 1, y2_g - height_interval - y2_da,
-                           tag='graph',
-                           fill = get_state('dynamic_text_color'),
-                           width = get_state('widget_border_width'))
+        if get_state('daily_allowance') < max_graph_amount: # dont draw the DA line if it is out of bounds
+            y2_da = ((height - height_interval * 2) / max_graph_amount) * get_state('daily_allowance')
+            canvas.create_line(x1_g + 1, y2_g - height_interval - y2_da, x2_g - 1, y2_g - height_interval - y2_da,
+                               tag='graph',
+                               fill = get_state('dynamic_text_color'),
+                               width = get_state('widget_border_width'))
     
     canvas.tag_raise('line_cost')
     canvas.tag_raise('bar')
@@ -742,29 +771,284 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
         widget.destroy()
     toolbar_widgets.clear()
     
-    main_rect_height = y2 - y1
-    main_rect_width = x2 - x1
+    text_offset = 15
 
-    x_bdgt_labels = x1 + main_rect_width / 25
-    y_interval = main_rect_height / 5
-    y_budget_increase = y_interval
+    rect_area_height = y2 - y1
+    rect_area_width = x2 - x1
 
-    widget_width = main_rect_width / 2
-    widget_height = y_interval
+    x_bdgt_labels = x1 + rect_area_width / 25
+    x_bdgt_buttons = x2 - rect_area_width / 25
+    y_interval = rect_area_height / 10
+    y_set_budget = y1 + y_interval
+    y_set_reserve = y1 + y_interval * 3
+    y_set_exchange = y1 + y_interval * 5
+    y_separation_line = y1 + y_interval * 7
 
-    budget_increase_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+    widget_width = rect_area_width / 2
+    widget_height = rect_area_height / 8
+
+    button_width = widget_height
+    button_height = widget_height
+
+    # Create entry field for increasing budget:
+    #--------------------------------------------
+    set_budget_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                         bd=get_state("widget_border_width") + 2,
                         relief='ridge',
                         foreground=get_state("widget_text_color"),
                         bg=get_state("window_bg_color"),
                         insertbackground=get_state("widget_text_color"))
     
-    budget_increase_entry.place(x = x_bdgt_labels, y = y_budget_increase,
+    set_budget_entry.place(x = x_bdgt_labels, y = y_set_budget,
                       width = widget_width,
                       height = widget_height,
                       anchor = 'nw')
-    toolbar_widgets.append(budget_increase_entry)
+    toolbar_widgets.append(set_budget_entry)
+    # And its text above:
+    canvas.create_text(x_bdgt_labels + widget_width / 2, y_set_budget - text_offset, 
+                       text="Set monthly budget to:", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
+                       fill=get_state("dynamic_text_color"),
+                       anchor = 'center')
+    
+    # And the currency text next to it:
+    canvas.create_text(x_bdgt_labels + widget_width + 10, y_set_budget + widget_height / 2, 
+                       text=get_state("currency"), 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
+                       fill=get_state("text_color"),
+                       anchor = 'w')
 
+    # And the button:
+    set_budget_button = Button(root, text='+', justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_XLARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('dynamic_text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=lambda: set_budget(set_budget_entry))
+                             
+    set_budget_button.place(x = x_bdgt_buttons, y = y_set_budget,
+                          width = button_width, height = button_height,
+                          anchor='ne')
+    toolbar_widgets.append(set_budget_button)
+
+
+    #--------------------------------------------
+    # Create entry field for setting monthly reserve:
+    #--------------------------------------------
+    set_reserve_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+                        bd=get_state("widget_border_width") + 2,
+                        relief='ridge',
+                        foreground=get_state("widget_text_color"),
+                        bg=get_state("window_bg_color"),
+                        insertbackground=get_state("widget_text_color"))
+    
+    set_reserve_entry.place(x = x_bdgt_labels, y = y_set_reserve,
+                      width = widget_width,
+                      height = widget_height,
+                      anchor = 'nw')
+    toolbar_widgets.append(set_reserve_entry)
+    # And its text above:
+    canvas.create_text(x_bdgt_labels + widget_width / 2, y_set_reserve - text_offset, 
+                       text="Set monthly reserve to:",
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
+                       fill=get_state("reserve_text_color"),
+                       anchor = 'center')
+    # And the currency text next to it:
+    canvas.create_text(x_bdgt_labels + widget_width + 10, y_set_reserve + widget_height / 2, 
+                       text=get_state("currency"), 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
+                       fill=get_state("text_color"),
+                       anchor = 'w')
+
+    # And the button:
+    set_reserve_button = Button(root, text='+', justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_XLARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('reserve_text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=lambda: set_reserve(set_reserve_entry))
+                             
+    set_reserve_button.place(x = x_bdgt_buttons, y = y_set_reserve,
+                          width = button_width, height = button_height,
+                          anchor='ne')
+    toolbar_widgets.append(set_reserve_button)
+    #--------------------------------------------------
+    # Create set eur to czk exchange rate
+    # --------------------------------------------------
+    set_czk_exchange = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+                        bd=get_state("widget_border_width") + 2,
+                        relief='ridge',
+                        foreground=get_state("widget_text_color"),
+                        bg=get_state("window_bg_color"),
+                        insertbackground=get_state("widget_text_color"))
+    
+    set_czk_exchange.place(x = x_bdgt_labels, y = y_set_exchange,
+                      width = widget_width,
+                      height = widget_height,
+                      anchor = 'nw')
+    toolbar_widgets.append(set_czk_exchange)
+    # text above
+    canvas.create_text(x_bdgt_labels, y_set_exchange - text_offset, 
+                       text="1 € → CZK exchange rate:", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
+                       fill=get_state("text_color"),
+                       anchor = 'w')
+    # current text
+    canvas.create_text(x_bdgt_labels, y_set_exchange + widget_height + 10, 
+                       text=f"1 € = {get_state('CZK_RATE')} CZK", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_XSMALL, BOLD, ITALIC),
+                       fill=get_state("dynamic_text_color"),
+                       anchor = 'w')
+    
+    # the buttone
+    set_exchange_button = Button(root, text='+', justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_XLARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=lambda: set_exchange(set_czk_exchange))
+                             
+    set_exchange_button.place(x = x_bdgt_buttons, y = y_set_exchange,
+                          width = button_width, height = button_height,
+                          anchor='ne')
+    toolbar_widgets.append(set_exchange_button)
+
+    # Create separation line for next buttons
+    canvas.create_line(x1, y_separation_line, x2, y_separation_line,
+                       tag='toolbar',
+                       fill=get_state("widget_border_color"),
+                       width=get_state("widget_border_width"))
+    
+    # create switch currency button
+    switch_curr_button = Button(root, text='€/CZK', justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_XLARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=switch_currency)
+                             
+    switch_curr_button.place(x = x_bdgt_buttons, y = y_set_exchange + 100,
+                          width = button_width, height = button_height,
+                          anchor='ne')
+    toolbar_widgets.append(switch_curr_button)
+def format_num_to_calc_ready(num: str) -> str:
+    num = num.replace(',', '.')
+    num = num.replace(' ', '')
+    return num
+def set_exchange(exch_entry_widget):
+    exch_amount = exch_entry_widget.get()
+    if not exch_amount:
+        messagebox.showerror("Error", "Please fill in the field.")
+        return None
+    else:
+        exch_amount = format_num_to_calc_ready(exch_amount)
+        try:
+            exch_amount = float(exch_amount)
+            if math.isnan(exch_amount) or math.isinf(exch_amount): # Just in case a cheeky user tries to add inf, -inf or NaN
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Exchange rate must be a number.")
+            return None
+    if round(exch_amount, 2) <= 0:
+        messagebox.showerror("Error", "Exchange rate must be greater than 0.")
+        return None
+    askyesno = messagebox.askyesno('Are you sure?', f'Do you want to set your € - CZK exchange rate to 1€ = {format_number(exch_amount)} CZK? Please ensure it is accurate.')
+    if askyesno == False:
+        return None
+    
+    # --- Fix: rebase values to new exchange rate ---
+    old_rate = get_state('CZK_RATE')
+    current_currency = get_state('currency')
+    # Convert all values to EUR using old rate, then to current currency using new rate
+    for key in ["budget", "reserve_at_end_of_month", "rolling_balance", "total_monthly_spendings"]:
+        value = get_state(key)
+        # Convert to EUR using old rate
+        if current_currency == "CZK":
+            value_in_eur = calculate_money_conversion(value, "CZK", "€", old_rate)
+        else:
+            value_in_eur = value
+        # Convert to current currency using new rate
+        if current_currency == "CZK":
+            new_value = calculate_money_conversion(value_in_eur, "€", "CZK", exch_amount)
+        else:
+            new_value = value_in_eur
+        set_state(key, new_value)
+    set_state('CZK_RATE', exch_amount)
+    save_app_states(app_states)
+    redraw_ui()
+
+def set_budget(budget_entry_widget):
+    # handle if num <= 0, inf or -inf, NaN
+    budget_amount = budget_entry_widget.get()
+    if not budget_amount:
+        messagebox.showerror("Error", "Please fill in the field.")
+        return None
+    else:
+        budget_amount = format_num_to_calc_ready(budget_amount)
+        try:
+            budget_amount = float(budget_amount)
+            if math.isnan(budget_amount) or math.isinf(budget_amount): # Just in case a cheeky user tries to add inf, -inf or NaN
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Budget must be a number.")
+            return None
+    if round(budget_amount, 2) <= 0:
+        messagebox.showerror("Error", "Budget must be greater than 0.")
+        return None
+    askyesno = messagebox.askyesno('Are you sure?', f'Do you want to set your monthly budget to {format_number(budget_amount)} {get_state("currency")}? This process is irreversible!')
+    if askyesno == False:
+        return None
+    set_state('budget', budget_amount)
+    save_app_states(app_states)
+    redraw_ui()
+
+def set_reserve(reserve_entry_widget):
+    # handle if num <= 0, inf or -inf, NaN
+    reserve_amount = reserve_entry_widget.get()
+    if not reserve_amount:
+        messagebox.showerror("Error", "Please fill in the field.")
+        return None
+    else:
+        reserve_amount = format_num_to_calc_ready(reserve_amount)
+        try:
+            reserve_amount = float(reserve_amount)
+            if math.isnan(reserve_amount) or math.isinf(reserve_amount): # Just in case a cheeky user tries to add inf, -inf or NaN
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Reserve must be a number.")
+            return None
+    if round(reserve_amount, 2) <= 0:
+        messagebox.showerror("Error", "Reserve must be greater than 0.")
+        return None
+    askyesno = messagebox.askyesno('Are you sure?', f'Do you want to set your monthly reserve to {format_number(reserve_amount)} {get_state("currency")}? This process is irreversible!')
+    if askyesno == False:
+        return None
+
+    set_state('reserve_at_end_of_month', reserve_amount)
+    save_app_states(app_states)
+    redraw_ui()
 
 transaction_widgets = []
 def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_rect_id: int):
@@ -1000,6 +1284,7 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
         messagebox.showerror("Error", "Please fill in all fields.")
         return None
     else:
+        price = format_num_to_calc_ready(price)
         try:
             price = float(price)
             if math.isnan(price) or math.isinf(price): # Just in case a cheeky user tries to add inf, -inf or NaN
@@ -1067,7 +1352,7 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
                        anchor='center',
                        justify='center')
 
-def switch_currency(event):
+def switch_currency():
     if get_state("currency") == "€":
         new_currency = "CZK"
     else:
@@ -1169,6 +1454,7 @@ def increase_graph_month(event):
         month_to_show += 1
     redraw_ui()
 
+switch_dark_mode_colors(get_state('is_dark_mode'))
 set_daily_allowance()
 create_windows(get_padding_x(), get_state("padding_y"))
 draw_scrollbar()
@@ -1180,8 +1466,8 @@ root.bind("<Escape>", toggle_fullscreen)
 root.bind("<D>", toggle_dark_mode)
 root.bind("<d>", toggle_dark_mode)
 root.bind("a", add)
-root.bind("<C>", switch_currency)
-root.bind("<c>", switch_currency)
+# root.bind("<C>", switch_currency)
+# root.bind("<c>", switch_currency)
 root.bind("<MouseWheel>", scroll_transactions)
 root.bind("<Left>", lower_graph_month)
 root.bind("<Right>", increase_graph_month)
