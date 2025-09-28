@@ -61,6 +61,9 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "current_month": 0, # calculated in code
     "current_year": 0, # calculated in code
     "current_day": 0, # calculated in code
+    "day_when_last_app_close": 0, # calculated in code
+    "month_when_last_app_close": 0, # calculated in code
+    "year_when_last_app_close": 0, # calculated in code
     "padding_y": 1,
     "WINDOW_SCALING_PERCENT": 100, 
     "is_fullscreen": True,
@@ -111,7 +114,7 @@ transactions = load_transactions()
 
 
 def get_padding_x():
-    return app_states["padding_y"] / (WINDOW_WIDTH / WINDOW_HEIGHT)
+    return app_states["padding_y"] / (window_width / window_height)
 
 def get_state(key):
     return app_states[key]
@@ -151,12 +154,12 @@ def add_daily_allowance():
 
 # Window dimensions and scaling configurations
 WINDOW_SCALING_PERCENT = get_state("WINDOW_SCALING_PERCENT") # Percentage of screen size to use for window dimensions
-WINDOW_WIDTH = root.winfo_screenwidth() * (WINDOW_SCALING_PERCENT / 100)
-WINDOW_HEIGHT = root.winfo_screenheight() * (WINDOW_SCALING_PERCENT / 100)
-WINDOW_X_CENTER = WINDOW_WIDTH / 2
-WINDOW_Y_CENTER = WINDOW_HEIGHT / 2
-ONE_PERCENT_HEIGHT = WINDOW_HEIGHT / 100
-ONE_PERCENT_WIDTH = WINDOW_WIDTH / 100
+window_width = root.winfo_screenwidth() * (WINDOW_SCALING_PERCENT / 100)
+window_height = root.winfo_screenheight() * (WINDOW_SCALING_PERCENT / 100)
+WINDOW_X_CENTER = window_width / 2
+WINDOW_Y_CENTER = window_height / 2
+ONE_PERCENT_HEIGHT = window_height / 100
+ONE_PERCENT_WIDTH = window_width / 100
 
 # Text configurations
 FONT = 'Arial'
@@ -179,7 +182,7 @@ TITLE = "Finanční Podpúrce 3000"
 #       Application Window         #
 # -------------------------------- #
 
-canvas = Canvas(root, width = WINDOW_WIDTH, height = WINDOW_HEIGHT, bg = get_state("window_bg_color"))
+canvas = Canvas(root, width = window_width, height = window_height, bg = get_state("window_bg_color"))
 canvas.pack()
 
 def switch_dark_mode_colors(is_dark_mode: bool):
@@ -218,10 +221,10 @@ def center_screen():
     screen_height = root.winfo_screenheight() # Height of the user screen.
 
     # Starting X & Y window positions:
-    x = (screen_width / 2) - (WINDOW_WIDTH / 2)
-    y = (screen_height / 2) - (WINDOW_HEIGHT / 2)
+    x = (screen_width / 2) - (window_width / 2)
+    y = (screen_height / 2) - (window_height / 2)
 
-    root.geometry('%dx%d+%d+%d' % (WINDOW_WIDTH, WINDOW_HEIGHT, x, y))
+    root.geometry('%dx%d+%d+%d' % (window_width, window_height, x, y))
     TM = ' (Samuel Ondroš 2025 ©)'
     root.title(TITLE + TM)
 
@@ -470,6 +473,7 @@ def set_month():
 
 def set_today():
     today = datetime.today()
+    # calculate day difference and add daily allowance * days passed
     set_state('current_day', today.day)
 
 set_today()
@@ -493,7 +497,7 @@ def on_enter(event):
     price_tag = tags[1]
     price_tag_f = price_tag.replace(',', '.')
     price_tag_f = price_tag_f[:price_tag_f.index(' ')]
-    if event.x > WINDOW_WIDTH * 0.75:
+    if event.x > window_width * 0.75:
         anchor = 'ne'
         x_offset = -10
     else:
@@ -635,7 +639,7 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
     
     max_graph_amount = max(initial_max, highest_day_sum)
     min_lines = 8
-    max_lines = 18
+    max_lines = 15
     min_amount = initial_max
     max_amount = total_budget
     
@@ -945,7 +949,7 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
     else:
         txt = 'CZK'
     switch_curr_button = Button(root, text=txt, justify='center', 
-                             font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+                             font=f'{FONT} {TEXT_SIZE_NORMAL} {BOLD}',
                              bd=get_state("widget_border_width") + 2,
                              relief='ridge',
                              foreground=get_state('text_color'),
@@ -981,30 +985,28 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
                           anchor='nw')
     toolbar_widgets.append(dark_mode_button)
 
-    # create fullscreen button
-    if get_state('is_dark_mode') == True:
-        txt = '⛶'
-    else:
-        txt = '⏾'
-    fullscreen_button = Button(root, text=txt, justify='center', 
-                             font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
-                             bd=get_state("widget_border_width") + 2,
-                             relief='ridge',
-                             foreground=get_state('text_color'),
-                             bg=get_state("window_bg_color"),
-                             cursor='hand2',
-                             activebackground=get_state('button_active_bg'),
-                             activeforeground=get_state("button_active_fg"),
-                             command=restart)
-                             
-    fullscreen_button.place(x = (x_bdgt_labels + x_bdgt_buttons) / 2, y = y1 + y_interval * 7.5,
-                          width = button_width, height = button_height,
-                          anchor='n')
-    toolbar_widgets.append(fullscreen_button)
-def restart():
-    root.destroy()
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
+    # Create controls text
+    canvas.create_text((x1 + x2) / 2, y1 + y_interval * 7.5, 
+                       text=f"Controls:", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
+                       fill=get_state("dynamic_text_color"),
+                       anchor = 'center')
+    # <- ->
+    canvas.create_text((x1 + x2) / 2, y1 + y_interval * 8, 
+                       text=f"← → = change graph month", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD),
+                       fill=get_state("text_color"),
+                       anchor = 'center')
+    
+    # up down
+    canvas.create_text((x1 + x2) / 2, y1 + y_interval * 8.5, 
+                       text=f"↑ ↓ = change padding", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_SMALL, BOLD),
+                       fill=get_state("text_color"),
+                       anchor = 'center')
 
 def format_num_to_calc_ready(num: str) -> str:
     num = num.replace(',', '.')
@@ -1082,6 +1084,9 @@ def set_reserve(reserve_entry_widget):
         except ValueError:
             messagebox.showerror("Error", "Reserve must be a number.")
             return None
+    if reserve_amount > get_state('budget'):
+        messagebox.showerror('Error', 'Monthly reserve cannot be greater than monthly budget.')
+        return None
     if round(reserve_amount, 2) <= 0:
         messagebox.showerror("Error", "Reserve must be greater than 0.")
         return None
@@ -1263,7 +1268,7 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
     # Text on the top left corner of the currency section indicating pending spendings below the budget
     total_spent = format_number(get_state("total_monthly_spendings"))
     canvas.create_text(x2 - 10, y2_currency - 10,
-                       text=f'- {total_spent} {get_state("currency")} total spendings',
+                       text=f'- {total_spent} {get_state("currency")} total monthly spendings',
                        tag="allowance_currency",
                        font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
                        fill=get_state("reserve_text_color"),
@@ -1338,7 +1343,16 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
     if round(price, 2) <= 0:
         messagebox.showerror("Error", "Price must be greater than 0.")
         return None
-    
+    if get_state('budget') + get_state('rolling_balance') < price:
+        messagebox.showerror("Error", "This transaction's price is greater than your budget. Please increase your budget to input this transaction.")
+        return None
+    if get_state('budget') + get_state('rolling_balance') - price <= get_state('reserve_at_end_of_month'):
+        askyesno = messagebox.askyesno("Warning", "This transaction's price will push your budget below the monthly reserve. The reserve will be cleared (set to 0). You will have to set a new reserve manually. Do you wish to proceed?")
+        if askyesno == True:
+            set_state('reserve_at_end_of_month', 0)
+        else: 
+            return None
+
     if price > get_state("rolling_balance"):
         messagebox.showwarning("Warning", "This transaction's price exceeds your daily allowance, meaning it will impact your future daily earnings.")
     rolling_bal_before = app_states["rolling_balance"]
@@ -1432,7 +1446,7 @@ def calculate_height_in_percent(padding_y: float, percentage: float) -> float:
 
 def increase_padding(event):
     '''Increases the padding around UI elements.'''
-    if get_state("padding_y") < 10: # Limit maximum padding to 10%
+    if get_state("padding_y") < 4: # Limit maximum padding to 4%
         set_state("padding_y", get_state("padding_y") + 0.5)
         redraw_ui()
 
@@ -1502,8 +1516,8 @@ set_daily_allowance()
 create_windows(get_padding_x(), get_state("padding_y"))
 draw_scrollbar()
 
-root.bind("w", increase_padding)
-root.bind("s", decrease_padding)
+root.bind("<Up>", increase_padding)
+root.bind("<Down>", decrease_padding)
 root.bind("<Escape>", exit_app)
 
 # root.bind("<D>", toggle_dark_mode)
