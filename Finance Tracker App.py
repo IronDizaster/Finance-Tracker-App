@@ -7,6 +7,7 @@ from datetime import datetime
 import math 
 import calendar
 import os # For checking if a file exists
+import sys
 
 root = Tk()
 spendings = 100
@@ -48,7 +49,7 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "total_monthly_spendings": 0,
     "daily_allowance": 0, # calculated in code
     "rolling_balance": 0, # calculated in code
-    "CZK_RATE": 24.32,
+    "CZK_RATE": 24.25,
     "days_left_in_month": get_days_left_in_curr_month(), # CURRENTLY NOT USED
     "window_bg_color": "#CBCBCB",
     "widget_border_color": "#000000",
@@ -118,7 +119,7 @@ def get_state(key):
 def set_state(key, value):
     app_states[key] = value
 
-def calculate_money_conversion(money: float, currency_before: str, currency_after: str, exchange_rate=get_state('CZK_RATE')) -> float:
+def calculate_money_conversion(money: float, currency_before: str, currency_after: str, exchange_rate: float) -> float:
     exchange_rates = {
         "€": {"CZK": exchange_rate},
         "CZK": {"€": 1/exchange_rate}
@@ -226,16 +227,17 @@ def center_screen():
 
 root.attributes("-fullscreen", get_state("is_fullscreen"))
 
-def toggle_fullscreen(event):
-    '''Toggles fullscreen mode for the application window.
+def exit_app(event):
+    '''Exits the app.
     Args:
         event (tkinter.Event): The event that triggered fullscreen toggle.
     '''
-    set_state("is_fullscreen", not get_state("is_fullscreen"))
-    root.attributes("-fullscreen", get_state("is_fullscreen"))
+    q = messagebox.askyesno('Warning', 'Are you sure you want to exit the application?')
     save_app_states(app_states)
+    if q == True:
+        root.destroy()
 
-def toggle_dark_mode(event):
+def toggle_dark_mode():
     '''Toggles dark mode for the application window.
     Args:
         event (tkinter.Event): The event that triggered dark mode toggle.
@@ -938,8 +940,12 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
                        width=get_state("widget_border_width"))
     
     # create switch currency button
-    switch_curr_button = Button(root, text='€/CZK', justify='center', 
-                             font=f'{FONT} {TEXT_SIZE_XLARGE} {BOLD}',
+    if get_state('currency') == 'CZK':
+        txt = '€'
+    else:
+        txt = 'CZK'
+    switch_curr_button = Button(root, text=txt, justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                              bd=get_state("widget_border_width") + 2,
                              relief='ridge',
                              foreground=get_state('text_color'),
@@ -949,10 +955,57 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
                              activeforeground=get_state("button_active_fg"),
                              command=switch_currency)
                              
-    switch_curr_button.place(x = x_bdgt_buttons, y = y_set_exchange + 100,
+    switch_curr_button.place(x = x_bdgt_buttons, y = y1 + y_interval * 7.5,
                           width = button_width, height = button_height,
                           anchor='ne')
     toolbar_widgets.append(switch_curr_button)
+
+    # create dark mode button
+    if get_state('is_dark_mode') == True:
+        txt = '☀'
+    else:
+        txt = '⏾'
+    dark_mode_button = Button(root, text=txt, justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=toggle_dark_mode)
+                             
+    dark_mode_button.place(x = x_bdgt_labels, y = y1 + y_interval * 7.5,
+                          width = button_width, height = button_height,
+                          anchor='nw')
+    toolbar_widgets.append(dark_mode_button)
+
+    # create fullscreen button
+    if get_state('is_dark_mode') == True:
+        txt = '⛶'
+    else:
+        txt = '⏾'
+    fullscreen_button = Button(root, text=txt, justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=restart)
+                             
+    fullscreen_button.place(x = (x_bdgt_labels + x_bdgt_buttons) / 2, y = y1 + y_interval * 7.5,
+                          width = button_width, height = button_height,
+                          anchor='n')
+    toolbar_widgets.append(fullscreen_button)
+def restart():
+    root.destroy()
+    python = sys.executable
+    os.execl(python, python, *sys.argv)
+
 def format_num_to_calc_ready(num: str) -> str:
     num = num.replace(',', '.')
     num = num.replace(' ', '')
@@ -978,24 +1031,14 @@ def set_exchange(exch_entry_widget):
     if askyesno == False:
         return None
     
-    # --- Fix: rebase values to new exchange rate ---
-    old_rate = get_state('CZK_RATE')
-    current_currency = get_state('currency')
-    # Convert all values to EUR using old rate, then to current currency using new rate
-    for key in ["budget", "reserve_at_end_of_month", "rolling_balance", "total_monthly_spendings"]:
-        value = get_state(key)
-        # Convert to EUR using old rate
-        if current_currency == "CZK":
-            value_in_eur = calculate_money_conversion(value, "CZK", "€", old_rate)
-        else:
-            value_in_eur = value
-        # Convert to current currency using new rate
-        if current_currency == "CZK":
-            new_value = calculate_money_conversion(value_in_eur, "€", "CZK", exch_amount)
-        else:
-            new_value = value_in_eur
-        set_state(key, new_value)
-    set_state('CZK_RATE', exch_amount)
+    # TODO fix this bullshit
+
+    if get_state('currency') == 'CZK':
+        switch_currency() # Switch to eur
+        set_state('CZK_RATE', exch_amount) # Set rate
+        switch_currency() # Recalculate
+    else:
+        set_state('CZK_RATE', exch_amount)
     save_app_states(app_states)
     redraw_ui()
 
@@ -1229,7 +1272,7 @@ def create_allowance_currency(x1: float, x2: float, y1: float, y2: float, main_r
     # Text on the bottom left corner of the currency section indicating reserve at end of month
     reserve = get_state("reserve_at_end_of_month")
     canvas.create_text(x1 + 10, y2_currency - 10,
-                       text=f'Monthly reserve: {reserve:.2f} {get_state("currency")}',
+                       text=f'Monthly reserve: {format_number(reserve)} {get_state("currency")}',
                        tag="allowance_currency",
                        font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
                        fill=get_state("reserve_text_color"),
@@ -1357,10 +1400,10 @@ def switch_currency():
         new_currency = "CZK"
     else:
         new_currency = "€"
-    money_amount = calculate_money_conversion(get_state("budget"), get_state("currency"), new_currency)
-    reserve_amount = calculate_money_conversion(get_state("reserve_at_end_of_month"), get_state("currency"), new_currency)
-    rolling_balance = calculate_money_conversion(get_state("rolling_balance"), get_state("currency"), new_currency)
-    total_monthly_spendings = calculate_money_conversion(get_state("total_monthly_spendings"), get_state("currency"), new_currency)
+    money_amount = calculate_money_conversion(get_state("budget"), get_state("currency"), new_currency, get_state('CZK_RATE'))
+    reserve_amount = calculate_money_conversion(get_state("reserve_at_end_of_month"), get_state("currency"), new_currency, get_state('CZK_RATE'))
+    rolling_balance = calculate_money_conversion(get_state("rolling_balance"), get_state("currency"), new_currency, get_state('CZK_RATE'))
+    total_monthly_spendings = calculate_money_conversion(get_state("total_monthly_spendings"), get_state("currency"), new_currency, get_state('CZK_RATE'))
     set_state("currency", new_currency)
     set_state("budget", money_amount)
     set_state("reserve_at_end_of_month", reserve_amount)
@@ -1461,10 +1504,10 @@ draw_scrollbar()
 
 root.bind("w", increase_padding)
 root.bind("s", decrease_padding)
-root.bind("<Escape>", toggle_fullscreen)
+root.bind("<Escape>", exit_app)
 
-root.bind("<D>", toggle_dark_mode)
-root.bind("<d>", toggle_dark_mode)
+# root.bind("<D>", toggle_dark_mode)
+# root.bind("<d>", toggle_dark_mode)
 root.bind("a", add)
 # root.bind("<C>", switch_currency)
 # root.bind("<c>", switch_currency)
