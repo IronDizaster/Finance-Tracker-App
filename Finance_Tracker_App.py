@@ -43,14 +43,14 @@ def get_days_in_month(month: int, year: int) -> int:
 
 def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     default_app_states = {
-    "budget": 0.001,
+    "budget": 0,
     "currency": "€",
     "reserve_at_end_of_month": 0,
     "total_monthly_spendings": 0,
     "daily_allowance": 0, # calculated in code
     "rolling_balance": 0, # calculated in code
     "CZK_RATE": 24.25,
-    "days_left_in_month": get_days_left_in_curr_month(), # CURRENTLY NOT USED
+    "days_left_in_month": 0, # calculated in code
     "window_bg_color": "#CBCBCB",
     "widget_border_color": "#000000",
     "widget_fill_color": "#FFFFFF",
@@ -61,13 +61,10 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "current_month": 0, # calculated in code
     "current_year": 0, # calculated in code
     "current_day": 0, # calculated in code
-    "day_when_last_app_close": 0, # calculated in code
-    "month_when_last_app_close": 0, # calculated in code
-    "year_when_last_app_close": 0, # calculated in code
     "padding_y": 1,
     "WINDOW_SCALING_PERCENT": 100, 
     "is_fullscreen": True,
-    "is_dark_mode": True,
+    "is_dark_mode": False,
     "dynamic_text_color": "#1B552F",  # This color is used for dynamic text (e.g., changing allowance)
     "reserve_text_color": "#FD3D3D",
     "text_color": "#000000",  # Default text color (black for light mode)
@@ -112,7 +109,6 @@ create_transaction_json_if_nonexistent()
 app_states = load_app_states()
 transactions = load_transactions()
 
-
 def get_padding_x():
     return app_states["padding_y"] / (window_width / window_height)
 
@@ -142,14 +138,13 @@ def calculate_daily_allowance(budget: float, reserve: float) -> float:
     return allowance_per_day
 
 def set_daily_allowance():
+    set_state('days_left_in_month', get_days_left_in_curr_month())
     daily_allowance = calculate_daily_allowance(get_state("budget"), get_state("reserve_at_end_of_month"))
     set_state("daily_allowance", daily_allowance)
 
 def add_daily_allowance():
-    set_state('days_left_in_month', get_state('days_left_in_month') - 1)
     set_state("rolling_balance", get_state("rolling_balance") + get_state("daily_allowance"))
     set_state("budget", get_state("budget") - get_state("daily_allowance"))
-    set_daily_allowance()
 
 
 # Window dimensions and scaling configurations
@@ -181,6 +176,70 @@ TITLE = "Finanční Podpúrce 3000"
 # -------------------------------- #
 #       Application Window         #
 # -------------------------------- #
+def set_year():
+    today = datetime.today()
+    set_state('current_year', today.year)
+    save_app_states(app_states)
+def set_month():
+    today = datetime.today()
+    set_state('current_month', today.month)
+    save_app_states(app_states)
+def set_today():
+    today = datetime.today()
+    set_state('current_day', today.day)
+    save_app_states(app_states)
+
+if app_states["current_day"] == 0 or app_states["current_month"] == 0 or app_states["current_year"] == 0 or app_states["days_left_in_month"] == 0:
+    app_states['days_left_in_month'] = get_days_left_in_curr_month()
+    set_today()
+    set_month()
+    set_year()
+    app_states = load_app_states()
+
+def restore_default_values():
+    set_state('budget', 0)
+    set_state('rolling_balance', 0)
+    set_state('reserve_at_end_of_month', 0)
+    set_state('total_monthly_spendings', 0)
+    save_app_states(app_states)
+
+def check_days_passed_and_set_dates():
+    global year_to_show, month_to_show
+    today = datetime.today()
+    day_today = today.day
+    month_today = today.month
+    year_today = today.year
+
+
+    # calculate day difference
+    # First check if a new year has started - if so, reset and inform about savings and reset
+    if year_today != get_state('current_year'):
+        # New year has started
+        messagebox.showinfo('Happy new year!', f"A new year has started. Your budget has been reset.\nIn your last monthly session, you saved {format_number(get_state('budget') + get_state('rolling_balance'))} {get_state('currency')}!\nYou spent a total of {format_number(get_state('total_monthly_spendings'))} {get_state('currency')}.")
+        restore_default_values()
+    elif month_today != get_state('current_month'):
+        # New month has started
+        messagebox.showinfo('New month!', f"A new month has started. Your budget has been reset.\nIn your last monthly session, you saved {format_number(get_state('budget') + get_state('rolling_balance'))} {get_state('currency')}!\nYou spent a total of {format_number(get_state('total_monthly_spendings'))} {get_state('currency')}.")
+        restore_default_values()
+    elif day_today != get_state('current_day'):
+        # Calculates day difference
+        day_diff = day_today - get_state('current_day')
+        if day_diff == 1:
+            has_text = 'has'
+            day_txt = 'day'
+        else:
+            has_text = 'have'
+            day_txt = 'days'
+        for i in range(day_diff):
+            add_daily_allowance()
+        messagebox.showinfo('Your daily allowance has increased!', f"{day_diff} {day_txt} {has_text} passed since the last time you opened the app. During that time, your daily allowance increased by {format_number(get_state('daily_allowance') * day_diff)} {get_state('currency')}! Happy spendings!")
+
+    set_today()
+    set_month()
+    set_year()
+    year_to_show = get_state('current_year')
+    month_to_show = get_state('current_month')
+    redraw_ui()
 
 canvas = Canvas(root, width = window_width, height = window_height, bg = get_state("window_bg_color"))
 canvas.pack()
@@ -231,13 +290,10 @@ def center_screen():
 root.attributes("-fullscreen", get_state("is_fullscreen"))
 
 def exit_app(event):
-    '''Exits the app.
-    Args:
-        event (tkinter.Event): The event that triggered fullscreen toggle.
-    '''
+    '''Exits the app.'''
     q = messagebox.askyesno('Warning', 'Are you sure you want to exit the application?')
-    save_app_states(app_states)
     if q == True:
+        save_app_states(app_states)
         root.destroy()
 
 def toggle_dark_mode():
@@ -463,22 +519,6 @@ def delete_transaction(txn_id):
     set_daily_allowance()
     redraw_ui()
 
-def set_year():
-    today = datetime.today()
-    set_state('current_year', today.year)
-
-def set_month():
-    today = datetime.today()
-    set_state('current_month', today.month)
-
-def set_today():
-    today = datetime.today()
-    # calculate day difference and add daily allowance * days passed
-    set_state('current_day', today.day)
-
-set_today()
-set_month()
-set_year()
 # TODO: Check if new month is different from previous month in each 2 of these functions!!!!!
 
 month_to_show = get_state("current_month")
@@ -537,8 +577,15 @@ def on_motion(event):
         event.widget.coords(rect_tooltip_id, bbox)
 
 graph_header_id = None
+last_midnight_check = None
 def initiate_timer():
+    global last_midnight_check, month_to_show, year_to_show
     canvas.delete('timer')
+    today = datetime.today()
+    upd_day = today.day
+    upd_month = today.month
+    upd_year = today.year
+    today_str = date.today().isoformat()
     current_time = get_current_time()
     x1, y1, x2, y2 = canvas.coords(graph_header_id)
     canvas.create_text(x2 - 10, y2 - abs(y1 - y2) / 2,
@@ -547,7 +594,37 @@ def initiate_timer():
                        tag="timer",
                        font=(FONT, TEXT_SIZE_LARGE),
                        fill=get_state("dynamic_text_color"))
+    canvas.create_text(x1 + 10, y2 - abs(y1 - y2) / 2,
+                       text=f"{get_state('current_day')}.{get_state('current_month')}.{get_state('current_year')}",
+                       anchor='w',
+                       tag="timer",
+                       font=(FONT, TEXT_SIZE_LARGE),
+                       fill=get_state("dynamic_text_color"))
+    # Check each second if day, month or year updated (horrible I know)
+    if current_time == '00:00:00' and last_midnight_check != today_str:
+        last_midnight_check = today_str
+        if get_state('current_year') != upd_year:
+            # Year changed
+            messagebox.showinfo('Happy new year!', f"A new year has started. Your budget has been reset.\nIn your last monthly session, you saved {format_number(get_state('budget') + get_state('rolling_balance'))} {get_state('currency')}!\nYou spent a total of {format_number(get_state('total_monthly_spendings'))} {get_state('currency')}.")
+            restore_default_values()
+        elif get_state('current_month') != upd_month:
+            # month changed
+            messagebox.showinfo('New month!', f"A new month has started. Your budget has been reset.\nIn your last monthly session, you saved {format_number(get_state('budget') + get_state('rolling_balance'))} {get_state('currency')}!\nYou spent a total of {format_number(get_state('total_monthly_spendings'))} {get_state('currency')}.")
+            restore_default_values()
+        elif get_state('current_day') != upd_day:
+            # day changed
+            add_daily_allowance()
+            messagebox.showinfo('Daily allowance increased!', f"Your daily allowance has increased by {format_number(get_state('daily_allowance'))} {get_state('currency')}")
+        
+        set_today()
+        set_month()
+        set_year()
+        set_daily_allowance()
+        year_to_show = get_state('current_year')
+        month_to_show = get_state('current_month')
+        redraw_ui()
     canvas.after(1000, initiate_timer)
+
     
 def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: float, y2: float, main_rect_id: int):
     global graph_header_id
@@ -591,13 +668,7 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
                         tag="graph",
                         font=(FONT, TEXT_SIZE_LARGE),
                         fill=get_state("text_color"))
-    
-    canvas.create_text(x1 + 10, abs(2 * y1_g - height_header) / 2,
-                       text=f"{get_state('current_day')}.{get_state('current_month')}.{get_state('current_year')}",
-                       anchor='w',
-                       tag="graph",
-                       font=(FONT, TEXT_SIZE_LARGE),
-                       fill=get_state("dynamic_text_color"))
+
     initiate_timer()
     day_amount = get_days_in_month(month_to_show, year_to_show)
     start_date = date(year_to_show, month_to_show, 1)
@@ -623,6 +694,7 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
             else:
                 date_price_sums[txn_date] = price
 
+    print(date_price_sums)
     w = calculate_width_of_item(main_box)
     interval = w / (day_amount)
     
@@ -1511,9 +1583,8 @@ def increase_graph_month(event):
         month_to_show += 1
     redraw_ui()
 
-switch_dark_mode_colors(get_state('is_dark_mode'))
-set_daily_allowance()
 create_windows(get_padding_x(), get_state("padding_y"))
+check_days_passed_and_set_dates()
 draw_scrollbar()
 
 root.bind("<Up>", increase_padding)
@@ -1522,7 +1593,6 @@ root.bind("<Escape>", exit_app)
 
 # root.bind("<D>", toggle_dark_mode)
 # root.bind("<d>", toggle_dark_mode)
-root.bind("a", add)
 # root.bind("<C>", switch_currency)
 # root.bind("<c>", switch_currency)
 root.bind("<MouseWheel>", scroll_transactions)
