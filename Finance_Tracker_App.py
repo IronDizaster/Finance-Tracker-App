@@ -7,7 +7,6 @@ from datetime import datetime
 import math 
 import calendar
 import os # For checking if a file exists
-import sys
 
 root = Tk()
 spendings = 100
