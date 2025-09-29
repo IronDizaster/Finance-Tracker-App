@@ -672,12 +672,10 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
     initiate_timer()
     day_amount = get_days_in_month(month_to_show, year_to_show)
     start_date = date(year_to_show, month_to_show, 1)
-    print(start_date)
 
     date_range = [(start_date + timedelta(days=i)).isoformat() for i in range(day_amount)]
     date_price_sums = {}
 
-    #print(date_range)
     # Calculate how much money was spent on each day
     current_currency = get_state('currency')
     for key, transaction in transactions.items():
@@ -694,11 +692,9 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
             else:
                 date_price_sums[txn_date] = price
 
-    print(date_price_sums)
     w = calculate_width_of_item(main_box)
     interval = w / (day_amount)
     
-    print(interval)
     x_offset = 3
     y_offset = 17
     total_budget = get_state('budget') + get_state('total_monthly_spendings') + get_state('rolling_balance') - get_state('reserve_at_end_of_month')
@@ -1031,7 +1027,7 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
                              activeforeground=get_state("button_active_fg"),
                              command=switch_currency)
                              
-    switch_curr_button.place(x = x_bdgt_buttons, y = y1 + y_interval * 7.5,
+    switch_curr_button.place(x = x_bdgt_labels + button_width * 2 + text_offset, y = y1 + y_interval * 7.5,
                           width = button_width, height = button_height,
                           anchor='ne')
     toolbar_widgets.append(switch_curr_button)
@@ -1057,33 +1053,63 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
                           anchor='nw')
     toolbar_widgets.append(dark_mode_button)
 
+    # create restore default button
+    reset_button = Button(root, text='↺', justify='center', 
+                             font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+                             bd=get_state("widget_border_width") + 2,
+                             relief='ridge',
+                             foreground=get_state('text_color'),
+                             bg=get_state("window_bg_color"),
+                             cursor='hand2',
+                             activebackground=get_state('button_active_bg'),
+                             activeforeground=get_state("button_active_fg"),
+                             command=reset_defaults)
+                             
+    reset_button.place(x = x_bdgt_labels + button_width * 3.33333 + text_offset, y = y1 + y_interval * 7.5,
+                          width = button_width, height = button_height,
+                          anchor='ne')
+    toolbar_widgets.append(reset_button)
     # Create controls text
-    canvas.create_text((x1 + x2) / 2, y1 + y_interval * 7.5, 
+    offst = 1.025
+    canvas.create_text((x1 + x2) / 2 * offst, y1 + y_interval * 7.5, 
                        text=f"Controls:", 
                        tag="toolbar",
-                       font=(FONT, TEXT_SIZE_NORMAL, BOLD),
-                       fill=get_state("dynamic_text_color"),
-                       anchor = 'center')
-    # <- ->
-    canvas.create_text((x1 + x2) / 2, y1 + y_interval * 8, 
-                       text=f"← → = change graph month", 
-                       tag="toolbar",
                        font=(FONT, TEXT_SIZE_SMALL, BOLD),
+                       fill=get_state("dynamic_text_color"),
+                       anchor = 'w')
+    # <- ->
+    canvas.create_text((x1 + x2) / 2 * offst, y1 + y_interval * 8.1, 
+                       text=f"← → = change graph \nmonth", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_XSMALL, BOLD),
                        fill=get_state("text_color"),
-                       anchor = 'center')
+                       anchor = 'w')
     
     # up down
-    canvas.create_text((x1 + x2) / 2, y1 + y_interval * 8.5, 
+    canvas.create_text((x1 + x2) / 2 * offst, y1 + y_interval * 8.7, 
                        text=f"↑ ↓ = change padding", 
                        tag="toolbar",
-                       font=(FONT, TEXT_SIZE_SMALL, BOLD),
+                       font=(FONT, TEXT_SIZE_XSMALL, BOLD),
                        fill=get_state("text_color"),
-                       anchor = 'center')
+                       anchor = 'w')
 
+    # ESC
+    canvas.create_text((x1 + x2) / 2 * offst, y1 + y_interval * 9.3, 
+                       text=f"ESC = close app", 
+                       tag="toolbar",
+                       font=(FONT, TEXT_SIZE_XSMALL, BOLD),
+                       fill=get_state("reserve_text_color"),
+                       anchor = 'w')
 def format_num_to_calc_ready(num: str) -> str:
     num = num.replace(',', '.')
     num = num.replace(' ', '')
     return num
+
+def reset_defaults():
+    askyesno = messagebox.askyesno('Are you sure?', 'Do you want to RESET your budget, daily allowance balance and total spendings? This action is irreversible!\nYour transaction history will remain unchanged.')
+    if askyesno == True:
+        restore_default_values()
+        redraw_ui()
 def set_exchange(exch_entry_widget):
     exch_amount = exch_entry_widget.get()
     if not exch_amount:
@@ -1138,6 +1164,12 @@ def set_budget(budget_entry_widget):
     if askyesno == False:
         return None
     set_state('budget', budget_amount)
+    if get_state('rolling_balance') == 0:
+        set_daily_allowance()
+        rolling_bal_addon = get_state('rolling_balance') + ((get_state('budget') - get_state('reserve_at_end_of_month')) / (get_days_left_in_curr_month() + 1))
+        set_state('rolling_balance', rolling_bal_addon)
+        set_state('budget', get_state('budget') - rolling_bal_addon)
+        messagebox.showinfo('Daily allowance added', "Since your daily allowance balance was 0 when setting the budget, 1 daily allowance has been added to your balance. Happy spending!")
     save_app_states(app_states)
     redraw_ui()
 
@@ -1600,9 +1632,3 @@ root.bind("<Left>", lower_graph_month)
 root.bind("<Right>", increase_graph_month)
 center_screen()
 root.mainloop()
-
-# TODO: Add a way to reset the rolling balance to the initial budget at the start of a new month.
-# TODO: Calculate rolling balance based on current date.
-# TODO: Add graphs to visualize spendings over time.
-# TODO: Reset daily allowance and rolling balance at the start of a new month (with notifications how much they saved).
-# TODO: 

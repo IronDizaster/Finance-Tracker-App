@@ -1,3 +1,23 @@
 {
-    "next_txn_id": 1
+    "next_txn_id": 3,
+    "1": {
+        "date": "2025-09-29",
+        "time": "02:46:12",
+        "item": "Pivo",
+        "price": 52.0,
+        "currency": "CZK",
+        "czk_exchange_rate": 24.25,
+        "rolling_bal_hit": 52.0,
+        "budget_hit": 0
+    },
+    "2": {
+        "date": "2025-09-29",
+        "time": "02:46:30",
+        "item": "Burger v Kobylisoch",
+        "price": 209.0,
+        "currency": "CZK",
+        "czk_exchange_rate": 24.25,
+        "rolling_bal_hit": 209.0,
+        "budget_hit": 0
+    }
 }
