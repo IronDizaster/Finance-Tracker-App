@@ -1121,7 +1121,7 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
     if get_state('is_dark_mode') == True:
         txt = '☀'
     else:
-        txt = '⏾'
+        txt = '☾'
     dark_mode_button = Button(root, text=txt, justify='center', 
                              font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                              bd=get_state("widget_border_width") + 2,
@@ -1245,16 +1245,26 @@ def set_budget(budget_entry_widget):
     if round(budget_amount, 2) <= 0:
         messagebox.showerror("Error", "Budget must be greater than 0.")
         return None
+    
+    if get_state('currency') == '€':
+        budget_limit = 1_000_000
+    else:
+        budget_limit = calculate_money_conversion(1_000_000, '€', 'CZK', get_state('CZK_RATE'))
+
+    if round(budget_amount, 2) > budget_limit:
+        messagebox.showerror("Error", f"Budget is too high. Maximum allowed budget is\n{format_number(budget_limit)} {get_state('currency')}")
+        return None
     askyesno = messagebox.askyesno('Are you sure?', f'Do you want to set your monthly budget to {format_number(budget_amount)} {get_state("currency")}? This process is irreversible!')
     if askyesno == False:
         return None
     set_state('budget', budget_amount)
     if get_state('rolling_balance') == 0:
-        set_daily_allowance()
         rolling_bal_addon = get_state('rolling_balance') + ((get_state('budget') - get_state('reserve_at_end_of_month')) / (get_days_left_in_curr_month() + 1))
-        set_state('rolling_balance', rolling_bal_addon)
-        set_state('budget', get_state('budget') - rolling_bal_addon)
-        messagebox.showinfo('Daily allowance added', "Since your daily allowance balance was 0 when setting the budget, 1 daily allowance has been added to your balance. Happy spending!")
+        q = messagebox.askyesno('Add daily allowance for today?', f'Your current daily allowance is 0,00 {get_state("currency")}. Do you want to add +{format_number(rolling_bal_addon)} {get_state("currency")} to your daily allowance for today?')
+        if q == True:
+            set_daily_allowance()
+            set_state('rolling_balance', rolling_bal_addon)
+            set_state('budget', get_state('budget') - rolling_bal_addon)
     save_app_states(app_states)
     redraw_ui()
 
@@ -1276,8 +1286,8 @@ def set_reserve(reserve_entry_widget):
     if reserve_amount > get_state('budget'):
         messagebox.showerror('Error', 'Monthly reserve cannot be greater than monthly budget.')
         return None
-    if round(reserve_amount, 2) <= 0:
-        messagebox.showerror("Error", "Reserve must be greater than 0.")
+    if round(reserve_amount, 2) < 0:
+        messagebox.showerror("Error", "Reserve must be greater than or equal to 0.")
         return None
     askyesno = messagebox.askyesno('Are you sure?', f'Do you want to set your monthly reserve to {format_number(reserve_amount)} {get_state("currency")}? This process is irreversible!')
     if askyesno == False:
