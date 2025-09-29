@@ -29,7 +29,7 @@ def get_days_left_in_curr_month() -> int:
     month = today.month
     day = today.day
     days_in_month = calendar.monthrange(year, month)[1]
-    return days_in_month - day + 1 # +1 to include today
+    return days_in_month - day # +1 to include today
 
 def get_days_in_curr_month() -> int:
     today = date.today()
@@ -337,6 +337,19 @@ def create_transaction_history_label(x1: float, x2: float, y1: float, y2: float,
                         font=(FONT, TEXT_SIZE_LARGE),
                         fill=get_state("text_color"))
 
+    canvas.create_text(x1 + 10, (y2_currency + y2_trans) / 2, 
+                        text="LMB = show full transaction info", 
+                        tag="trans",
+                        font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                        fill=get_state("dynamic_text_color"),
+                        anchor='w')
+    
+    canvas.create_text(x2 - 10, (y2_currency + y2_trans) / 2, 
+                        text="RMB = delete transaction", 
+                        tag="trans",
+                        font=(FONT, TEXT_SIZE_SMALL, BOLD, ITALIC),
+                        fill=get_state("dynamic_text_color"),
+                        anchor='e')
     create_transaction_history(x1, x2, y2_currency, y2_trans, main_rect_id)
 
 TRANSACTION_FONT = 'Consolas' # MUST BE MONOSPACE OTHERWISE EMPTY SPACE CALCULATING WILL FAIL
@@ -460,12 +473,85 @@ def create_trnsc(txn_key, transaction_frame, label_width, char_width, transactio
     label.update_idletasks()
     label.txn_id = txn_key
     label.bind("<Button-3>", lambda e, lbl = label: show_context_menu(e, lbl))
+    label.bind("<Button-1>", lambda e, lbl = label: show_info_in_toolbar(e, lbl))
     if before == None:
         transaction_history_widgets.append(label)
     else:
         transaction_history_widgets.insert(1, label) 
         # very very sloppy code but this is to account for scrolling up to optimize (terribleness)
 
+info_box = None
+def show_info_in_toolbar(event, label):
+    global selected_txn, info_box
+    selected_txn = label.txn_id
+    if info_box and info_box.winfo_exists():
+        info_box.destroy()
+        info_box = None
+    # TXN INFO:
+    txn_text = transactions[selected_txn]['item']
+    txn_date = transactions[selected_txn]['date']
+    year = txn_date[:4]
+    month = txn_date[5:7]
+    day = txn_date[8:]
+    txn_date_text = f'{day}.{month}.{year}'
+    txn_time = transactions[selected_txn]['time']
+    txn_exch = transactions[selected_txn]['czk_exchange_rate']
+
+    txn_currency = transactions[selected_txn]['currency']
+    txn_budget_hit = transactions[selected_txn]['budget_hit']
+    txn_da_hit = transactions[selected_txn]['rolling_bal_hit']
+    if txn_currency == '€':
+        txn_price_in_eur = format_number(transactions[selected_txn]['price'])
+        txn_price_in_czk = format_number(calculate_money_conversion(transactions[selected_txn]['price'], '€', 'CZK', txn_exch))
+        txn_bh_in_eur = format_number(txn_budget_hit)
+        txn_bh_in_czk = format_number(calculate_money_conversion(txn_budget_hit, '€', 'CZK', txn_exch))
+        txn_da_in_eur = format_number(txn_da_hit)
+        txn_da_in_czk = format_number(calculate_money_conversion(txn_da_hit, '€', 'CZK', txn_exch))
+        txn_price_text = f'{txn_price_in_eur} € ({txn_price_in_czk} CZK)'
+        txn_bh_text = f'{txn_bh_in_eur} € ({txn_bh_in_czk} CZK)'
+        txn_da_text = f'{txn_da_in_eur} € ({txn_da_in_czk} CZK)'
+    else:
+        # its in czk
+        txn_price_in_czk = format_number(transactions[selected_txn]['price'])
+        txn_price_in_eur = format_number(calculate_money_conversion(transactions[selected_txn]['price'], 'CZK', '€', txn_exch))
+        txn_bh_in_eur = format_number(calculate_money_conversion(txn_budget_hit, 'CZK', '€', txn_exch))
+        txn_bh_in_czk = format_number(txn_budget_hit)
+        txn_da_in_czk = format_number(txn_da_hit)
+        txn_da_in_eur = format_number(calculate_money_conversion(txn_da_hit, 'CZK', '€', txn_exch))
+        txn_price_text = f'{txn_price_in_czk} CZK ({txn_price_in_eur} €)'
+        txn_bh_text = f'{txn_bh_in_czk} CZK ({txn_bh_in_eur} €)'
+        txn_da_text = f'{txn_da_in_czk} CZK ({txn_da_in_eur} €)'
+
+    x = label.winfo_rootx() + label.winfo_width() + 5  # right of label
+    y = label.winfo_rooty()
+    info_box = Toplevel(root)
+    info_box.wm_overrideredirect(True)  # no window frame
+    info_box.geometry(f"+{x}+{y}")
+
+    Label(info_box, text=f'Full name : {txn_text}\nInput date : {txn_date_text}\nInput time : {txn_time}\nTransaction exchange rate : 1€ = {txn_exch} CZK\nPrice : {txn_price_text}\n------------------------------------------------\n(B!) Spent from budget : {txn_bh_text}\nSpent from daily allowance: {txn_da_text}', 
+             bg="lightyellow", justify='left',
+             relief="solid", borderwidth=1, wraplength=400,
+             font=(TRANSACTION_FONT, TEXT_SIZE_SMALL)).pack(ipadx=6, ipady=6)
+    
+    for l in transaction_history_widgets[1:]:
+        l.config(bg=get_state('window_bg_color'))
+    label.config(bg='lightblue')
+    root.bind('<Button-1>', click_away)
+    root.bind('<Button-2>', click_away)
+    root.bind('<Button-3>', click_away)
+
+def click_away(event):
+    global info_box
+    if not info_box:
+        return
+    
+    info_box.destroy()
+    info_box = None
+    for l in transaction_history_widgets[1:]:
+        l.config(bg=get_state('window_bg_color'))
+    root.unbind('<Button-1>')
+    root.unbind('<Button-2>')
+    root.unbind('<Button-3>')
 def show_context_menu(event, label):
     global selected_txn
     selected_txn = label.txn_id
@@ -866,7 +952,7 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
 
     # Create entry field for increasing budget:
     #--------------------------------------------
-    set_budget_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+    set_budget_entry = Entry(root, justify='left', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                         bd=get_state("widget_border_width") + 2,
                         relief='ridge',
                         foreground=get_state("widget_text_color"),
@@ -915,7 +1001,7 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
     #--------------------------------------------
     # Create entry field for setting monthly reserve:
     #--------------------------------------------
-    set_reserve_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+    set_reserve_entry = Entry(root, justify='left', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                         bd=get_state("widget_border_width") + 2,
                         relief='ridge',
                         foreground=get_state("widget_text_color"),
@@ -961,7 +1047,7 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
     #--------------------------------------------------
     # Create set eur to czk exchange rate
     # --------------------------------------------------
-    set_czk_exchange = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+    set_czk_exchange = Entry(root, justify='left', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                         bd=get_state("widget_border_width") + 2,
                         relief='ridge',
                         foreground=get_state("widget_text_color"),
@@ -1223,7 +1309,7 @@ def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_
     button_width = x1 / (8 + y1 / 25)
     button_height = button_width
     # Item Name Entry Text Window:
-    item_name_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+    item_name_entry = Entry(root, justify='left', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                         bd=get_state("widget_border_width") + 2,
                         relief='ridge',
                         foreground=get_state("widget_text_color"),
@@ -1244,7 +1330,7 @@ def create_transaction_widgets(x1: float, y1: float, x2: float, y2: float, main_
                        fill=get_state("text_color"))
     
     # Price Entry Text Window:
-    price_entry = Entry(root, justify='center', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
+    price_entry = Entry(root, justify='left', font=f'{FONT} {TEXT_SIZE_LARGE} {BOLD}',
                         bd=get_state("widget_border_width") + 2,
                         relief='ridge',
                         foreground=get_state("widget_text_color"),

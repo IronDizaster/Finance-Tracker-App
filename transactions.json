@@ -1,23 +1,33 @@
 {
-    "next_txn_id": 3,
-    "1": {
-        "date": "2025-09-29",
-        "time": "02:46:12",
+    "next_txn_id": 14,
+    "11": {
+        "date": "2025-09-21",
+        "time": "21:27:16",
         "item": "Pivo",
-        "price": 52.0,
-        "currency": "CZK",
+        "price": 2.0,
+        "currency": "€",
         "czk_exchange_rate": 24.25,
-        "rolling_bal_hit": 52.0,
+        "rolling_bal_hit": 2.0,
         "budget_hit": 0
     },
-    "2": {
-        "date": "2025-09-29",
-        "time": "02:46:30",
-        "item": "Burger v Kobylisoch",
-        "price": 209.0,
-        "currency": "CZK",
+    "12": {
+        "date": "2025-09-21",
+        "time": "21:27:21",
+        "item": "burger",
+        "price": 12.25,
+        "currency": "€",
         "czk_exchange_rate": 24.25,
-        "rolling_bal_hit": 209.0,
+        "rolling_bal_hit": 12.25,
+        "budget_hit": 0
+    },
+    "13": {
+        "date": "2025-09-21",
+        "time": "21:27:34",
+        "item": "YouTube Premium Príplatok",
+        "price": 6.99,
+        "currency": "€",
+        "czk_exchange_rate": 24.25,
+        "rolling_bal_hit": 6.99,
         "budget_hit": 0
     }
 }
