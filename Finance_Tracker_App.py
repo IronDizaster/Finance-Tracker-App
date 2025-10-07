@@ -68,7 +68,6 @@ def create_data_json_if_nonexistent(file_path=FINANCE_DATA_PATH):
     "reserve_text_color": "#FD3D3D",
     "text_color": "#000000",  # Default text color (black for light mode)
 }
-    # TODO: update current_month, current year and current day on app start
     
     if not os.path.exists(file_path):
         with open(file_path, 'w') as file:
@@ -129,11 +128,11 @@ def calculate_money_conversion(money: float, currency_before: str, currency_afte
     conversion_rate = exchange_rates[currency_before][currency_after]
     return money * conversion_rate
 
-# TODO: Calculate daily allowance ONLY whenever the budget is changed!! 
-# Maybe create a function that initializes the budget (later)
-
 def calculate_daily_allowance(budget: float, reserve: float) -> float:
-    allowance_per_day = (budget - reserve) / get_state('days_left_in_month')
+    if get_state('days_left_in_month') == 0:
+        allowance_per_day = 0
+    else:
+        allowance_per_day = (budget - reserve) / get_state('days_left_in_month')
     return allowance_per_day
 
 def set_daily_allowance():
@@ -188,7 +187,7 @@ def set_today():
     set_state('current_day', today.day)
     save_app_states(app_states)
 
-if app_states["current_day"] == 0 or app_states["current_month"] == 0 or app_states["current_year"] == 0 or app_states["days_left_in_month"] == 0:
+if app_states["current_day"] == 0 or app_states["current_month"] == 0 or app_states["current_year"] == 0:
     app_states['days_left_in_month'] = get_days_left_in_curr_month()
     set_today()
     set_month()
@@ -208,7 +207,7 @@ def check_days_passed_and_set_dates():
     day_today = today.day
     month_today = today.month
     year_today = today.year
-
+    print(f"current (last saved): {get_state('current_day')} {get_state('current_month')} {get_state('current_year')}\nupdated: {day_today} {month_today} {year_today}")
 
     # calculate day difference
     # First check if a new year has started - if so, reset and inform about savings and reset
@@ -527,7 +526,7 @@ def show_info_in_toolbar(event, label):
     info_box.wm_overrideredirect(True)  # no window frame
     info_box.geometry(f"+{x}+{y}")
 
-    Label(info_box, text=f'Full name : {txn_text}\nInput date : {txn_date_text}\nInput time : {txn_time}\nTransaction exchange rate : 1€ = {txn_exch} CZK\nPrice : {txn_price_text}\n------------------------------------------------\n(B!) Spent from budget : {txn_bh_text}\nSpent from daily allowance: {txn_da_text}', 
+    Label(info_box, text=f'Full name : {txn_text}\nInput date : {txn_date_text}\nInput time : {txn_time}\nTransaction exchange rate : 1€ = {format_number(txn_exch)} CZK\nPrice : {txn_price_text}\n------------------------------------------------\n(B!) Spent from budget : {txn_bh_text}\nSpent from daily allowance: {txn_da_text}', 
              bg="lightyellow", justify='left',
              relief="solid", borderwidth=1, wraplength=400,
              font=(TRANSACTION_FONT, TEXT_SIZE_SMALL)).pack(ipadx=6, ipady=6)
@@ -603,8 +602,6 @@ def delete_transaction(txn_id):
     save_transactions(transactions)
     set_daily_allowance()
     redraw_ui()
-
-# TODO: Check if new month is different from previous month in each 2 of these functions!!!!!
 
 month_to_show = get_state("current_month")
 year_to_show = get_state("current_year")
@@ -687,6 +684,7 @@ def initiate_timer():
                        fill=get_state("dynamic_text_color"))
     # Check each second if day, month or year updated (horrible I know)
     if current_time == '00:00:00' and last_midnight_check != today_str:
+        print('I RAN')
         last_midnight_check = today_str
         if get_state('current_year') != upd_year:
             # Year changed
@@ -783,13 +781,22 @@ def create_graph(padding_x: float, padding_y: float, x1: float, x2: float, y1: f
     x_offset = 3
     y_offset = 17
     total_budget = get_state('budget') + get_state('total_monthly_spendings') + get_state('rolling_balance') - get_state('reserve_at_end_of_month')
-    initial_max = get_state('daily_allowance') * 4
 
     if date_price_sums != {}:
         highest_day_sum = max(list(date_price_sums.values()))
     else:
         highest_day_sum = 0
-    
+
+    if get_state('daily_allowance') > 0:
+        # There are still days left in month
+        initial_max = get_state('daily_allowance') * 4
+    else:
+        # 0 days left - calculate initial max as 75 € or converted czk value
+        if get_state('currency') == '€':
+            initial_max = 50
+        else:
+            initial_max = calculate_money_conversion(50, '€', 'CZK', get_state('CZK_RATE'))
+    # TODO: fix this
     max_graph_amount = max(initial_max, highest_day_sum)
     min_lines = 8
     max_lines = 15
@@ -1067,7 +1074,7 @@ def create_toolbar_widgets(x1, y1, x2, y2, main_rect_id):
                        anchor = 'w')
     # current text
     canvas.create_text(x_bdgt_labels, y_set_exchange + widget_height + 10, 
-                       text=f"1 € = {get_state('CZK_RATE')} CZK", 
+                       text=f"1 € = {format_number(get_state('CZK_RATE'))} CZK", 
                        tag="toolbar",
                        font=(FONT, TEXT_SIZE_XSMALL, BOLD, ITALIC),
                        fill=get_state("dynamic_text_color"),
@@ -1216,8 +1223,6 @@ def set_exchange(exch_entry_widget):
     if askyesno == False:
         return None
     
-    # TODO fix this bullshit
-
     if get_state('currency') == 'CZK':
         switch_currency() # Switch to eur
         set_state('CZK_RATE', exch_amount) # Set rate
@@ -1258,13 +1263,19 @@ def set_budget(budget_entry_widget):
     if askyesno == False:
         return None
     set_state('budget', budget_amount)
-    if get_state('rolling_balance') == 0:
+    if get_state('rolling_balance') == 0 and get_state('days_left_in_month') != 0:
         rolling_bal_addon = get_state('rolling_balance') + ((get_state('budget') - get_state('reserve_at_end_of_month')) / (get_days_left_in_curr_month() + 1))
         q = messagebox.askyesno('Add daily allowance for today?', f'Your current daily allowance is 0,00 {get_state("currency")}. Do you want to add +{format_number(rolling_bal_addon)} {get_state("currency")} to your daily allowance for today?')
         if q == True:
             set_daily_allowance()
             set_state('rolling_balance', rolling_bal_addon)
             set_state('budget', get_state('budget') - rolling_bal_addon)
+    if get_state('days_left_in_month') == 0:
+        rolling_bal_addon = get_state('rolling_balance') + ((get_state('budget') - get_state('reserve_at_end_of_month')) / (get_days_left_in_curr_month() + 1))
+        messagebox.showinfo('Budget added to daily allowance', f'It\'s the last day of the month. Due to monthly resets, your newly set budget got added to your daily allowance.')
+        set_daily_allowance()
+        set_state('rolling_balance', rolling_bal_addon)
+        set_state('budget', get_state('budget') - rolling_bal_addon)
     save_app_states(app_states)
     redraw_ui()
 
@@ -1563,10 +1574,7 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
         set_daily_allowance()
     else:
         budget_hit = 0
-    # TODO: pending spendings likely will cause bugs later when deleting transactions, investigate
-    # TODO: convert pending spendings between CZK and eur
-    # TODO: fix bug where when a transaction in czk hits the allowance converting it back to eur and back to czk returns
-    # a smaller value
+
     today = date.today().isoformat()
     current_time = get_current_time()
     # Create transaction as a dictionary:
@@ -1582,10 +1590,6 @@ def add_transaction(item_name_entry, price_entry, x_middle, y_bottom):
     
     item_name_entry.delete(0, END)
     price_entry.delete(0, END)
-
-    # TODO: Add more meta-data so that in the future when a transaction gets reverted, the program knows
-    #       how much it took from the daily allowance and from the budget - then add it to the budget & daily allowance
-    #       and recalculate
     
     # Add the transaction into transactions json with its own id:
     transactions[transaction_id] = transaction
